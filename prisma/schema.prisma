@@ -1,0 +1,225 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  hashedPassword String
+  name           String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Doctor {
+  id           String        @id @default(cuid())
+  name         String
+  specialty    String?
+  phone        String?
+  email        String?
+  active       Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  appointments Appointment[]
+}
+
+model Procedure {
+  id           String        @id @default(cuid())
+  name         String        @unique
+  description  String?
+  cupsCode     String?
+  active       Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  appointments Appointment[]
+}
+
+model Patient {
+  id               String           @id @default(cuid())
+  firstName        String
+  lastName         String
+  idNumber         String           @unique
+  phone            String
+  email            String?
+  birthDate        DateTime?
+  address          String?
+  guardianName     String?
+  guardianRelation String?
+  guardianPhone    String?
+  habeaDataConsent Boolean          @default(false)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  appointments     Appointment[]
+  clinicalHistory  ClinicalHistory?
+  cajaRecords      CajaRecord[]
+}
+
+model Appointment {
+  id            String    @id @default(cuid())
+  patientId     String
+  doctorId      String
+  procedureId   String
+  date          DateTime
+  reminderJobId String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  patient       Patient   @relation(fields: [patientId], references: [id])
+  doctor        Doctor    @relation(fields: [doctorId], references: [id])
+  procedure     Procedure @relation(fields: [procedureId], references: [id])
+}
+
+model ClinicalHistory {
+  id         String            @id @default(cuid())
+  patientId  String            @unique
+  background String?
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+  patient    Patient           @relation(fields: [patientId], references: [id])
+  notes      ClinicalNote[]
+  odontogram OdontogramEntry[]
+  files      PatientFile[]
+}
+
+model ClinicalNote {
+  id                String          @id @default(cuid())
+  clinicalHistoryId String
+  doctorId          String
+  type              NoteType
+  content           String
+  createdAt         DateTime        @default(now())
+  clinicalHistory   ClinicalHistory @relation(fields: [clinicalHistoryId], references: [id])
+}
+
+enum NoteType {
+  INGRESO
+  EVOLUCION
+  PROCEDIMIENTO
+  INTERCONSULTA
+  EGRESO
+}
+
+model OdontogramEntry {
+  id                String          @id @default(cuid())
+  clinicalHistoryId String
+  toothNumber       Int
+  surface           Surface
+  status            ToothStatus
+  note              String?
+  createdAt         DateTime        @default(now())
+  clinicalHistory   ClinicalHistory @relation(fields: [clinicalHistoryId], references: [id])
+}
+
+enum Surface {
+  OCLUSAL
+  MESIAL
+  DISTAL
+  VESTIBULAR
+  LINGUAL
+}
+
+enum ToothStatus {
+  SANO
+  CARIES
+  OBTURACION
+  CORONA
+  ENDODONCIA
+  IMPLANTE
+  AUSENTE
+  EXTRAIDO
+  FRACTURA
+}
+
+model PatientFile {
+  id                String          @id @default(cuid())
+  clinicalHistoryId String
+  name              String
+  label             String?
+  url               String
+  mimeType          String
+  createdAt         DateTime        @default(now())
+  clinicalHistory   ClinicalHistory @relation(fields: [clinicalHistoryId], references: [id])
+}
+
+model InventoryItem {
+  id             String            @id @default(cuid())
+  commercialName String
+  genericName    String?
+  sku            String            @unique
+  categoryId     String
+  quantity       Decimal           @db.Decimal(10, 3)
+  unit           InventoryUnit
+  minStock       Decimal           @db.Decimal(10, 3)
+  active         Boolean           @default(true)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  category       InventoryCategory @relation(fields: [categoryId], references: [id])
+  stockLogs      StockLog[]
+}
+
+model InventoryCategory {
+  id    String          @id @default(cuid())
+  name  String          @unique
+  items InventoryItem[]
+}
+
+model StockLog {
+  id          String        @id @default(cuid())
+  itemId      String
+  previousQty Decimal       @db.Decimal(10, 3)
+  newQty      Decimal       @db.Decimal(10, 3)
+  reason      String?
+  createdAt   DateTime      @default(now())
+  item        InventoryItem @relation(fields: [itemId], references: [id])
+}
+
+enum InventoryUnit {
+  UNIDAD
+  CAJA
+  PAQUETE
+  FRASCO
+  TUBO
+  ML
+  G
+}
+
+model CajaRecord {
+  id            String      @id @default(cuid())
+  patientId     String
+  description   String
+  total         Decimal     @db.Decimal(10, 2)
+  balance       Decimal     @db.Decimal(10, 2)
+  status        CajaStatus
+  invoiceId     String?
+  invoiceNumber String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  patient       Patient     @relation(fields: [patientId], references: [id])
+  payments      Payment[]
+}
+
+model Payment {
+  id           String        @id @default(cuid())
+  cajaRecordId String
+  amount       Decimal       @db.Decimal(10, 2)
+  method       PaymentMethod
+  createdAt    DateTime      @default(now())
+  cajaRecord   CajaRecord    @relation(fields: [cajaRecordId], references: [id])
+}
+
+enum CajaStatus {
+  PENDIENTE
+  ABONO_PARCIAL
+  PAGADO
+}
+
+enum PaymentMethod {
+  EFECTIVO
+  TRANSFERENCIA
+  TARJETA_DEBITO
+  TARJETA_CREDITO
+}
