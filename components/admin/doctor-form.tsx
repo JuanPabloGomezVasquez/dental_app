@@ -25,7 +25,9 @@ export function DoctorForm({ open, doctor, onSuccess, onClose }: DoctorFormProps
     setError,
     formState: { errors, isSubmitting },
   } = useForm<CreateDoctorInput>({
-    resolver: zodResolver(isEditing ? updateDoctorSchema : createDoctorSchema),
+    resolver: zodResolver(
+      (isEditing ? updateDoctorSchema : createDoctorSchema) as typeof createDoctorSchema
+    ),
   });
 
   useEffect(() => {

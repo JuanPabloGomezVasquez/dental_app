@@ -25,7 +25,9 @@ export function ProcedureForm({ open, procedure, onSuccess, onClose }: Procedure
     setError,
     formState: { errors, isSubmitting },
   } = useForm<CreateProcedureInput>({
-    resolver: zodResolver(isEditing ? updateProcedureSchema : createProcedureSchema),
+    resolver: zodResolver(
+      (isEditing ? updateProcedureSchema : createProcedureSchema) as typeof createProcedureSchema
+    ),
   });
 
   useEffect(() => {

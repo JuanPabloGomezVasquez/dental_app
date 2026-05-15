@@ -33,7 +33,9 @@ export function PatientForm({ open, patient, onSuccess, onClose }: PatientFormPr
     setError,
     formState: { errors, isSubmitting },
   } = useForm<CreatePatientInput>({
-    resolver: zodResolver(isEditing ? updatePatientSchema : createPatientSchema),
+    resolver: zodResolver(
+      (isEditing ? updatePatientSchema : createPatientSchema) as typeof createPatientSchema
+    ),
   });
 
   const birthDateValue = watch("birthDate");
