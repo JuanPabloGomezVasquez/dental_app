@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { X } from "lucide-react";
@@ -34,8 +34,8 @@ export function PatientForm({ open, patient, onSuccess, onClose }: PatientFormPr
     formState: { errors, isSubmitting },
   } = useForm<CreatePatientInput>({
     resolver: zodResolver(
-      (isEditing ? updatePatientSchema : createPatientSchema) as typeof createPatientSchema
-    ),
+      isEditing ? updatePatientSchema : createPatientSchema
+    ) as Resolver<CreatePatientInput>,
   });
 
   const birthDateValue = watch("birthDate");
