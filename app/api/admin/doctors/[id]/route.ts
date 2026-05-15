@@ -32,7 +32,7 @@ export async function PUT(
   const parsed = updateDoctorSchema.safeParse(body);
   if (!parsed.success) {
     return Response.json(
-      { error: parsed.error.errors[0]?.message ?? "Datos inválidos" },
+      { error: parsed.error.issues[0]?.message ?? "Datos inválidos" },
       { status: 400 }
     );
   }
@@ -56,7 +56,7 @@ export async function PATCH(
   const parsed = toggleDoctorSchema.safeParse(body);
   if (!parsed.success) {
     return Response.json(
-      { error: parsed.error.errors[0]?.message ?? "Datos inválidos" },
+      { error: parsed.error.issues[0]?.message ?? "Datos inválidos" },
       { status: 400 }
     );
   }

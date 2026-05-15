@@ -26,7 +26,7 @@ export async function POST(request: NextRequest): Promise<Response> {
   const parsed = createProcedureSchema.safeParse(body);
   if (!parsed.success) {
     return Response.json(
-      { error: parsed.error.errors[0]?.message ?? "Datos inválidos" },
+      { error: parsed.error.issues[0]?.message ?? "Datos inválidos" },
       { status: 400 }
     );
   }
