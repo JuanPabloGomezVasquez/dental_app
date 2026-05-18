@@ -1,9 +1,15 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, AppModule } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const db = new PrismaClient();
 
 async function main() {
+  const org = await db.organization.upsert({
+    where: { slug: "clinica-principal" },
+    update: {},
+    create: { name: "Clínica Principal", slug: "clinica-principal" },
+  });
+
   const hashedPassword = await bcrypt.hash("admin123", 12);
 
   await db.user.upsert({
@@ -13,6 +19,8 @@ async function main() {
       email: "admin@clinica.com",
       hashedPassword,
       name: "Administrador",
+      role: "ADMIN",
+      organizationId: org.id,
     },
   });
 
@@ -27,10 +35,19 @@ async function main() {
   ];
 
   for (const name of categories) {
-    await db.inventoryCategory.upsert({
-      where: { name },
+    const existing = await db.inventoryCategory.findFirst({
+      where: { name, organizationId: org.id },
+    });
+    if (!existing) {
+      await db.inventoryCategory.create({ data: { name, organizationId: org.id } });
+    }
+  }
+
+  for (const module of Object.values(AppModule)) {
+    await db.orgModule.upsert({
+      where: { organizationId_module: { organizationId: org.id, module } },
       update: {},
-      create: { name },
+      create: { organizationId: org.id, module, enabled: true },
     });
   }
 

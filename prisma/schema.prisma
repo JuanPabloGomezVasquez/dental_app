@@ -7,43 +7,109 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum UserRole {
+  ADMIN
+  DOCTOR
+}
+
+enum AppModule {
+  APPOINTMENTS
+  PATIENTS
+  INVENTORY
+  CAJA
+  AI_ASSISTANT
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users               User[]
+  doctors             Doctor[]
+  patients            Patient[]
+  appointments        Appointment[]
+  procedures          Procedure[]
+  inventoryCategories InventoryCategory[]
+  inventoryItems      InventoryItem[]
+  cajaRecords         CajaRecord[]
+  orgModules          OrgModule[]
+}
+
+model OrgModule {
+  id             String       @id @default(cuid())
+  organizationId String
+  module         AppModule
+  enabled        Boolean      @default(true)
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, module])
+}
+
+model DoctorModulePermission {
+  id       String    @id @default(cuid())
+  doctorId String
+  module   AppModule
+  enabled  Boolean   @default(true)
+  doctor   Doctor    @relation(fields: [doctorId], references: [id])
+
+  @@unique([doctorId, module])
+}
+
 model User {
-  id             String   @id @default(cuid())
-  email          String   @unique
+  id             String       @id @default(cuid())
+  email          String       @unique
   hashedPassword String
   name           String
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  role           UserRole     @default(ADMIN)
+  active         Boolean      @default(true)
+  organizationId String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  doctor         Doctor?      @relation("UserDoctor")
 }
 
 model Doctor {
-  id           String        @id @default(cuid())
-  name         String
-  specialty    String?
-  phone        String?
-  email        String?
-  active       Boolean       @default(true)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  appointments Appointment[]
+  id                String                   @id @default(cuid())
+  name              String
+  specialty         String?
+  phone             String?
+  email             String?
+  active            Boolean                  @default(true)
+  organizationId    String
+  userId            String?                  @unique
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+  organization      Organization             @relation(fields: [organizationId], references: [id])
+  user              User?                    @relation("UserDoctor", fields: [userId], references: [id])
+  appointments      Appointment[]
+  modulePermissions DoctorModulePermission[]
 }
 
 model Procedure {
-  id           String        @id @default(cuid())
-  name         String        @unique
-  description  String?
-  cupsCode     String?
-  active       Boolean       @default(true)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  appointments Appointment[]
+  id             String       @id @default(cuid())
+  name           String
+  description    String?
+  cupsCode       String?
+  active         Boolean      @default(true)
+  organizationId String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  appointments   Appointment[]
+
+  @@unique([name, organizationId])
 }
 
 model Patient {
   id               String           @id @default(cuid())
   firstName        String
   lastName         String
-  idNumber         String           @unique
+  idNumber         String
   phone            String
   email            String?
   birthDate        DateTime?
@@ -52,25 +118,31 @@ model Patient {
   guardianRelation String?
   guardianPhone    String?
   habeaDataConsent Boolean          @default(false)
+  organizationId   String
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
+  organization     Organization     @relation(fields: [organizationId], references: [id])
   appointments     Appointment[]
   clinicalHistory  ClinicalHistory?
   cajaRecords      CajaRecord[]
+
+  @@unique([idNumber, organizationId])
 }
 
 model Appointment {
-  id            String    @id @default(cuid())
-  patientId     String
-  doctorId      String
-  procedureId   String
-  date          DateTime
-  reminderJobId String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  patient       Patient   @relation(fields: [patientId], references: [id])
-  doctor        Doctor    @relation(fields: [doctorId], references: [id])
-  procedure     Procedure @relation(fields: [procedureId], references: [id])
+  id             String       @id @default(cuid())
+  patientId      String
+  doctorId       String
+  procedureId    String
+  date           DateTime
+  reminderJobId  String?
+  organizationId String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  patient        Patient      @relation(fields: [patientId], references: [id])
+  doctor         Doctor       @relation(fields: [doctorId], references: [id])
+  procedure      Procedure    @relation(fields: [procedureId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id])
 }
 
 model ClinicalHistory {
@@ -149,22 +221,30 @@ model InventoryItem {
   id             String            @id @default(cuid())
   commercialName String
   genericName    String?
-  sku            String            @unique
+  sku            String
   categoryId     String
   quantity       Decimal           @db.Decimal(10, 3)
   unit           InventoryUnit
   minStock       Decimal           @db.Decimal(10, 3)
   active         Boolean           @default(true)
+  organizationId String
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
   category       InventoryCategory @relation(fields: [categoryId], references: [id])
+  organization   Organization      @relation(fields: [organizationId], references: [id])
   stockLogs      StockLog[]
+
+  @@unique([sku, organizationId])
 }
 
 model InventoryCategory {
-  id    String          @id @default(cuid())
-  name  String          @unique
-  items InventoryItem[]
+  id             String        @id @default(cuid())
+  name           String
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id])
+  items          InventoryItem[]
+
+  @@unique([name, organizationId])
 }
 
 model StockLog {
@@ -188,18 +268,20 @@ enum InventoryUnit {
 }
 
 model CajaRecord {
-  id            String      @id @default(cuid())
-  patientId     String
-  description   String
-  total         Decimal     @db.Decimal(10, 2)
-  balance       Decimal     @db.Decimal(10, 2)
-  status        CajaStatus
-  invoiceId     String?
-  invoiceNumber String?
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-  patient       Patient     @relation(fields: [patientId], references: [id])
-  payments      Payment[]
+  id             String       @id @default(cuid())
+  patientId      String
+  description    String
+  total          Decimal      @db.Decimal(10, 2)
+  balance        Decimal      @db.Decimal(10, 2)
+  status         CajaStatus
+  invoiceId      String?
+  invoiceNumber  String?
+  organizationId String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  patient        Patient      @relation(fields: [patientId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  payments       Payment[]
 }
 
 model Payment {
