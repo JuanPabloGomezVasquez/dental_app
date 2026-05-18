@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import type { Doctor } from "@prisma/client";
 import { DoctorTable } from "@/components/admin/doctor-table";
 import { DoctorForm } from "@/components/admin/doctor-form";
+import { DoctorPermissionsPanel } from "@/components/admin/doctor-permissions-panel";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface DoctorsPageClientProps {
@@ -15,6 +16,7 @@ export function DoctorsPageClient({ initialDoctors }: DoctorsPageClientProps) {
   const [doctors, setDoctors] = useState<Doctor[]>(initialDoctors);
   const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [permissionsDoctor, setPermissionsDoctor] = useState<Doctor | null>(null);
   const [doctorToToggle, setDoctorToToggle] = useState<Doctor | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
@@ -93,6 +95,7 @@ export function DoctorsPageClient({ initialDoctors }: DoctorsPageClientProps) {
           doctors={doctors}
           onEdit={handleEdit}
           onToggleActive={handleToggleActive}
+          onPermissions={(doctor) => setPermissionsDoctor(doctor)}
         />
       </div>
 
@@ -101,6 +104,11 @@ export function DoctorsPageClient({ initialDoctors }: DoctorsPageClientProps) {
         doctor={selectedDoctor}
         onSuccess={handleFormSuccess}
         onClose={() => setIsFormOpen(false)}
+      />
+
+      <DoctorPermissionsPanel
+        doctor={permissionsDoctor}
+        onClose={() => setPermissionsDoctor(null)}
       />
 
       <ConfirmDialog

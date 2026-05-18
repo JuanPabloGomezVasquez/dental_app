@@ -2,6 +2,7 @@ import { Toaster } from "sonner";
 import { verifySession } from "@/lib/dal";
 import Sidebar from "@/components/layout/sidebar";
 import { inventoryService } from "@/lib/services/inventory.service";
+import { getAccessibleModules, AppModule } from "@/lib/modules";
 
 export default async function DashboardLayout({
   children,
@@ -9,11 +10,25 @@ export default async function DashboardLayout({
   children: React.ReactNode;
 }) {
   const session = await verifySession();
-  const alertCount = await inventoryService.getLowStockCount();
+  const accessibleModules = await getAccessibleModules(
+    session.organizationId,
+    session.role,
+    session.doctorId
+  );
+
+  const hasInventory = accessibleModules.has(AppModule.INVENTORY);
+  const alertCount = hasInventory
+    ? await inventoryService.getLowStockCount(session.organizationId)
+    : 0;
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50">
-      <Sidebar userName={session.name} inventoryAlerts={alertCount} />
+      <Sidebar
+        userName={session.name}
+        isAdmin={session.role === "ADMIN"}
+        enabledModules={[...accessibleModules]}
+        inventoryAlerts={alertCount}
+      />
       <main className="flex-1 overflow-auto">{children}</main>
       <Toaster position="top-right" richColors closeButton />
     </div>

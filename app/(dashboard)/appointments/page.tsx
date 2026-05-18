@@ -1,10 +1,11 @@
 import { verifySession } from "@/lib/dal"
+import { getAccessibleModules, assertModuleAccess, AppModule } from "@/lib/modules"
 import { appointmentsService } from "@/lib/services/appointments.service"
 import { AppointmentsPageClient } from "@/components/appointments/appointments-page-client"
 
 function getWeekRange(): { start: Date; end: Date } {
   const now = new Date()
-  const dayOfWeek = now.getDay() // 0 = Sunday
+  const dayOfWeek = now.getDay()
   const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
 
   const weekStart = new Date(now)
@@ -19,10 +20,18 @@ function getWeekRange(): { start: Date; end: Date } {
 }
 
 export default async function AppointmentsPage() {
-  await verifySession()
+  const session = await verifySession()
+  const accessible = await getAccessibleModules(session.organizationId, session.role, session.doctorId)
+  assertModuleAccess(accessible, AppModule.APPOINTMENTS)
 
   const { start, end } = getWeekRange()
-  const appointments = await appointmentsService.listByDateRange(start, end)
+  const appointments = await appointmentsService.listByDateRange(
+    start,
+    end,
+    session.organizationId,
+    session.role,
+    session.doctorId
+  )
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">

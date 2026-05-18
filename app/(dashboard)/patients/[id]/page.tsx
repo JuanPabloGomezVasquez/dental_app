@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { verifySession } from "@/lib/dal";
+import { getAccessibleModules, assertModuleAccess, AppModule } from "@/lib/modules";
 import { patientsService } from "@/lib/services/patients.service";
 import { clinicalHistoryService } from "@/lib/services/clinical-history.service";
 import { HabeaDataWarning } from "@/components/patients/habeas-data-warning";
@@ -13,13 +14,16 @@ interface PatientDetailPageProps {
 }
 
 export default async function PatientDetailPage({ params }: PatientDetailPageProps) {
-  await verifySession();
+  const session = await verifySession();
+  const accessible = await getAccessibleModules(session.organizationId, session.role, session.doctorId);
+  assertModuleAccess(accessible, AppModule.PATIENTS);
+
   const { id } = await params;
 
   let patient;
   let history;
   try {
-    patient = await patientsService.get(id);
+    patient = await patientsService.get(id, session.organizationId);
     history = await clinicalHistoryService.getByPatientId(id);
   } catch (error) {
     if (error instanceof NotFoundError) notFound();

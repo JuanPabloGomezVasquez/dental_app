@@ -12,9 +12,10 @@ interface DoctorTableProps {
   doctors: Doctor[];
   onEdit: (doctor: Doctor) => void;
   onToggleActive: (doctor: Doctor) => void;
+  onPermissions: (doctor: Doctor) => void;
 }
 
-export function DoctorTable({ doctors, onEdit, onToggleActive }: DoctorTableProps) {
+export function DoctorTable({ doctors, onEdit, onToggleActive, onPermissions }: DoctorTableProps) {
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<Tab>("all");
 
@@ -92,6 +93,13 @@ export function DoctorTable({ doctors, onEdit, onToggleActive }: DoctorTableProp
                         className="text-sm text-blue-600 hover:text-blue-800 font-medium"
                       >
                         Editar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onPermissions(doctor)}
+                        className="text-sm text-gray-500 hover:text-gray-800 font-medium"
+                      >
+                        Permisos
                       </button>
                       <button
                         type="button"

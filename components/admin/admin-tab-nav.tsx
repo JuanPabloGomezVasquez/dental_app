@@ -7,6 +7,7 @@ const tabs = [
   { href: "/admin/doctors", label: "Doctores" },
   { href: "/admin/procedures", label: "Procedimientos" },
   { href: "/admin/rips", label: "RIPS" },
+  { href: "/admin/settings", label: "Configuración" },
 ];
 
 export function AdminTabNav() {
