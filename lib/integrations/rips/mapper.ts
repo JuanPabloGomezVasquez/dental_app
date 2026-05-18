@@ -47,19 +47,19 @@ function formatDate(date: Date | null | undefined): string {
   return date.toISOString().split("T")[0]!;
 }
 
-export async function buildRipsJson(dateFrom: Date, dateTo: Date): Promise<RipsJson> {
+export async function buildRipsJson(dateFrom: Date, dateTo: Date, organizationId: string): Promise<RipsJson> {
   const nitConsultorio = getRequiredEnv("NIT_CONSULTORIO");
   const municipioCode = getRequiredEnv("RIPS_MUNICIPIO_CODE");
   const codPrestador = getRequiredEnv("RIPS_COD_PRESTADOR");
 
-  const appointments = await appointmentsService.listByDateRange(dateFrom, dateTo);
+  const appointments = await appointmentsService.listByDateRange(dateFrom, dateTo, organizationId, "ADMIN", null);
 
   const patientIds = [...new Set(appointments.map((a) => a.patientId))];
   const patientMap = new Map(
     await Promise.all(
       patientIds.map(async (pid) => {
         try {
-          const p = await patientsService.get(pid);
+          const p = await patientsService.get(pid, organizationId);
           return [pid, p] as const;
         } catch {
           return [pid, null] as const;

@@ -1,13 +1,14 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { anthropic } from "@/lib/integrations/anthropic/client";
 import { buildSystemPrompt } from "@/lib/integrations/anthropic/system-prompt";
-import { READ_TOOLS } from "@/lib/integrations/anthropic/tools/read-tools";
-import { WRITE_TOOLS } from "@/lib/integrations/anthropic/tools/write-tools";
+import { makeReadTools, type AgentContext } from "@/lib/integrations/anthropic/tools/read-tools";
+import { makeWriteTools } from "@/lib/integrations/anthropic/tools/write-tools";
 import type { ChatMessage, StreamEvent, ToolCall } from "@/lib/integrations/anthropic/types";
 
 export type AgentStreamInput = {
   messages: ChatMessage[];
   confirmedToolCall?: ToolCall;
+  context: AgentContext;
 };
 
 const MODEL = "claude-sonnet-4-6";
@@ -15,6 +16,9 @@ const MAX_TOKENS = 4096;
 const MAX_LOOP_ITERATIONS = 10;
 
 export function createAgentStream(input: AgentStreamInput): ReadableStream<Uint8Array> {
+  const readTools = makeReadTools(input.context);
+  const writeTools = makeWriteTools(input.context);
+
   return new ReadableStream({
     async start(controller) {
       const encoder = new TextEncoder();
@@ -31,7 +35,7 @@ export function createAgentStream(input: AgentStreamInput): ReadableStream<Uint8
 
         if (input.confirmedToolCall) {
           const { toolName, toolInput, toolUseId } = input.confirmedToolCall;
-          const writeTool = WRITE_TOOLS.find((t) => t.definition.name === toolName);
+          const writeTool = writeTools.find((t) => t.definition.name === toolName);
           const result = writeTool
             ? await writeTool.execute(toolInput)
             : JSON.stringify({ error: "Tool desconocida" });
@@ -52,7 +56,7 @@ export function createAgentStream(input: AgentStreamInput): ReadableStream<Uint8
         }
 
         const tokens = { input: 0, output: 0 };
-        await runLoop(messages, emit, tokens, 0);
+        await runLoop(messages, emit, tokens, 0, readTools, writeTools);
         emit({ type: "token_update", inputTokens: tokens.input, outputTokens: tokens.output });
         emit({ type: "done" });
       } catch (err) {
@@ -68,16 +72,18 @@ async function runLoop(
   messages: Anthropic.MessageParam[],
   emit: (event: StreamEvent) => void,
   tokens: { input: number; output: number },
-  iteration: number
+  iteration: number,
+  readTools: ReturnType<typeof makeReadTools>,
+  writeTools: ReturnType<typeof makeWriteTools>
 ): Promise<void> {
   if (iteration >= MAX_LOOP_ITERATIONS) {
     emit({ type: "text_delta", text: "\n[Límite de ciclos de herramientas alcanzado]" });
     return;
   }
 
-  const allTools = [...READ_TOOLS, ...WRITE_TOOLS];
-  const writeToolMap = new Map(WRITE_TOOLS.map((t) => [t.definition.name, t]));
-  const readToolMap = new Map(READ_TOOLS.map((t) => [t.definition.name, t]));
+  const allTools = [...readTools, ...writeTools];
+  const writeToolMap = new Map(writeTools.map((t) => [t.definition.name, t]));
+  const readToolMap = new Map(readTools.map((t) => [t.definition.name, t]));
 
   const stream = anthropic.messages.stream({
     model: MODEL,
@@ -138,6 +144,8 @@ async function runLoop(
     ],
     emit,
     tokens,
-    iteration + 1
+    iteration + 1,
+    readTools,
+    writeTools
   );
 }
