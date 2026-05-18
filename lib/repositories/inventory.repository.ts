@@ -21,30 +21,32 @@ const CATEGORY_SELECT = { select: { id: true, name: true } } as const;
 
 interface InventoryRepository {
   findAll(options?: {
+    organizationId: string;
     search?: string;
     categoryId?: string;
     active?: boolean;
   }): Promise<InventoryItemWithCategory[]>;
-  findById(id: string): Promise<InventoryItemWithCategory | null>;
-  findBySku(sku: string): Promise<InventoryItem | null>;
-  create(data: CreateInventoryItemInput): Promise<InventoryItemWithCategory>;
-  update(id: string, data: UpdateInventoryItemInput): Promise<InventoryItemWithCategory>;
-  setActive(id: string, active: boolean): Promise<InventoryItem>;
+  findById(id: string, organizationId: string): Promise<InventoryItemWithCategory | null>;
+  findBySku(sku: string, organizationId: string): Promise<InventoryItem | null>;
+  create(data: CreateInventoryItemInput & { organizationId: string }): Promise<InventoryItemWithCategory>;
+  update(id: string, organizationId: string, data: UpdateInventoryItemInput): Promise<InventoryItemWithCategory>;
+  setActive(id: string, organizationId: string, active: boolean): Promise<InventoryItem>;
   updateStock(
     id: string,
     previousQty: Prisma.Decimal,
     newQty: number,
     reason?: string
   ): Promise<InventoryItem>;
-  countLowStock(): Promise<number>;
-  getLowStockItems(): Promise<LowStockAlert[]>;
-  findAllCategories(): Promise<InventoryCategory[]>;
+  countLowStock(organizationId: string): Promise<number>;
+  getLowStockItems(organizationId: string): Promise<LowStockAlert[]>;
+  findAllCategories(organizationId: string): Promise<InventoryCategory[]>;
 }
 
 const repo: InventoryRepository = {
-  findAll({ search, categoryId, active } = {}) {
+  findAll({ organizationId, search, categoryId, active } = { organizationId: "" }) {
     return db.inventoryItem.findMany({
       where: {
+        organizationId,
         ...(search
           ? {
               OR: [
@@ -61,15 +63,15 @@ const repo: InventoryRepository = {
     });
   },
 
-  findById(id) {
-    return db.inventoryItem.findUnique({
-      where: { id },
+  findById(id, organizationId) {
+    return db.inventoryItem.findFirst({
+      where: { id, organizationId },
       include: { category: CATEGORY_SELECT },
     });
   },
 
-  findBySku(sku) {
-    return db.inventoryItem.findUnique({ where: { sku } });
+  findBySku(sku, organizationId) {
+    return db.inventoryItem.findFirst({ where: { sku, organizationId } });
   },
 
   create(data) {
@@ -79,16 +81,16 @@ const repo: InventoryRepository = {
     });
   },
 
-  update(id, data) {
+  update(id, organizationId, data) {
     return db.inventoryItem.update({
       where: { id },
-      data,
+      data: { ...data, organizationId },
       include: { category: CATEGORY_SELECT },
     });
   },
 
-  setActive(id, active) {
-    return db.inventoryItem.update({ where: { id }, data: { active } });
+  setActive(id, organizationId, active) {
+    return db.inventoryItem.update({ where: { id }, data: { active, organizationId } });
   },
 
   async updateStock(id, previousQty, newQty, reason) {
@@ -101,16 +103,16 @@ const repo: InventoryRepository = {
     return updatedItem;
   },
 
-  async countLowStock() {
+  async countLowStock(organizationId) {
     const items = await db.inventoryItem.findMany({
-      where: { active: true },
+      where: { organizationId, active: true },
       select: { quantity: true, minStock: true },
     });
     return items.filter((i) => i.quantity.lessThan(i.minStock)).length;
   },
 
-  async getLowStockItems() {
-    const items = await db.inventoryItem.findMany({ where: { active: true } });
+  async getLowStockItems(organizationId) {
+    const items = await db.inventoryItem.findMany({ where: { organizationId, active: true } });
     return items
       .filter((i) => i.quantity.lessThan(i.minStock))
       .map((i) => ({
@@ -122,8 +124,11 @@ const repo: InventoryRepository = {
       }));
   },
 
-  findAllCategories() {
-    return db.inventoryCategory.findMany({ orderBy: { name: "asc" } });
+  findAllCategories(organizationId) {
+    return db.inventoryCategory.findMany({
+      where: { organizationId },
+      orderBy: { name: "asc" },
+    });
   },
 };
 

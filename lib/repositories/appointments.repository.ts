@@ -2,11 +2,23 @@ import { db } from "@/lib/db"
 import type { AppointmentWithRelations, CreateAppointmentInput } from "@/lib/validations/appointment.schema"
 
 interface AppointmentsRepository {
-  findByDateRange(start: Date, end: Date, doctorId?: string): Promise<AppointmentWithRelations[]>
-  findById(id: string): Promise<AppointmentWithRelations | null>
+  findByDateRange(
+    start: Date,
+    end: Date,
+    organizationId: string,
+    doctorId?: string
+  ): Promise<AppointmentWithRelations[]>
+  findById(id: string, organizationId: string): Promise<AppointmentWithRelations | null>
   findByDoctorAndDate(doctorId: string, start: Date, end: Date): Promise<{ date: Date }[]>
-  create(data: { patientId: string; doctorId: string; procedureId: string; date: Date }): Promise<AppointmentWithRelations>
-  delete(id: string): Promise<void>
+  findPatientIdsByDoctor(doctorId: string, organizationId: string): Promise<string[]>
+  create(data: {
+    patientId: string
+    doctorId: string
+    procedureId: string
+    date: Date
+    organizationId: string
+  }): Promise<AppointmentWithRelations>
+  delete(id: string, organizationId: string): Promise<void>
   updateReminderJobId(id: string, reminderJobId: string | null): Promise<void>
 }
 
@@ -17,11 +29,12 @@ type PrismaAppointmentWithRelations = {
   procedureId: string
   date: Date
   reminderJobId: string | null
+  organizationId: string | null
   createdAt: Date
   updatedAt: Date
   patient: { firstName: string; lastName: string }
   doctor: { name: string }
-  procedure: { name: string }
+  procedure: { name: string; cupsCode: string | null }
 }
 
 function serialize(apt: PrismaAppointmentWithRelations): AppointmentWithRelations {
@@ -40,9 +53,10 @@ const INCLUDE = {
 } as const
 
 const repo: AppointmentsRepository = {
-  async findByDateRange(start, end, doctorId) {
+  async findByDateRange(start, end, organizationId, doctorId) {
     const apts = await db.appointment.findMany({
       where: {
+        organizationId,
         date: { gte: start, lte: end },
         ...(doctorId ? { doctorId } : {}),
       },
@@ -52,8 +66,11 @@ const repo: AppointmentsRepository = {
     return apts.map(serialize)
   },
 
-  async findById(id) {
-    const apt = await db.appointment.findUnique({ where: { id }, include: INCLUDE })
+  async findById(id, organizationId) {
+    const apt = await db.appointment.findFirst({
+      where: { id, organizationId },
+      include: INCLUDE,
+    })
     if (!apt) return null
     return serialize(apt)
   },
@@ -65,13 +82,22 @@ const repo: AppointmentsRepository = {
     })
   },
 
+  async findPatientIdsByDoctor(doctorId, organizationId) {
+    const apts = await db.appointment.findMany({
+      where: { doctorId, organizationId },
+      select: { patientId: true },
+      distinct: ["patientId"],
+    })
+    return apts.map((a) => a.patientId)
+  },
+
   async create(data) {
     const apt = await db.appointment.create({ data, include: INCLUDE })
     return serialize(apt)
   },
 
-  async delete(id) {
-    await db.appointment.delete({ where: { id } })
+  async delete(id, organizationId) {
+    await db.appointment.deleteMany({ where: { id, organizationId } })
   },
 
   async updateReminderJobId(id, reminderJobId) {
@@ -81,5 +107,4 @@ const repo: AppointmentsRepository = {
 
 export const appointmentsRepository = repo
 
-// Re-export type for consumers that need CreateAppointmentInput
 export type { CreateAppointmentInput }

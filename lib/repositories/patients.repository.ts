@@ -7,7 +7,10 @@ export type PatientListResult = {
   total: number;
 };
 
-type CreateData = Omit<CreatePatientInput, "birthDate"> & { birthDate?: Date };
+type CreateData = Omit<CreatePatientInput, "birthDate"> & {
+  birthDate?: Date;
+  organizationId: string;
+};
 type UpdateData = Omit<UpdatePatientInput, "birthDate"> & { birthDate?: Date };
 
 type AnonymizeData = {
@@ -42,27 +45,37 @@ export type PatientFullExport = Prisma.PatientGetPayload<{
 }>;
 
 interface PatientsRepository {
-  findAll(options?: { search?: string; skip?: number; take?: number }): Promise<PatientListResult>;
-  findById(id: string): Promise<Patient | null>;
-  findByIdNumber(idNumber: string): Promise<Patient | null>;
-  findFullExport(id: string): Promise<PatientFullExport | null>;
+  findAll(options?: {
+    organizationId: string;
+    search?: string;
+    skip?: number;
+    take?: number;
+    doctorPatientIds?: string[];
+  }): Promise<PatientListResult>;
+  findById(id: string, organizationId: string): Promise<Patient | null>;
+  findByIdNumber(idNumber: string, organizationId: string): Promise<Patient | null>;
+  findFullExport(id: string, organizationId: string): Promise<PatientFullExport | null>;
   create(data: CreateData): Promise<Patient>;
-  update(id: string, data: UpdateData): Promise<Patient>;
+  update(id: string, organizationId: string, data: UpdateData): Promise<Patient>;
   anonymize(id: string, data: AnonymizeData): Promise<void>;
   createClinicalHistory(patientId: string): Promise<void>;
 }
 
 const repo: PatientsRepository = {
-  async findAll({ search, skip = 0, take = 20 } = {}) {
-    const where = search
-      ? {
-          OR: [
-            { firstName: { contains: search, mode: "insensitive" as const } },
-            { lastName: { contains: search, mode: "insensitive" as const } },
-            { idNumber: { contains: search, mode: "insensitive" as const } },
-          ],
-        }
-      : undefined;
+  async findAll({ organizationId, search, skip = 0, take = 20, doctorPatientIds } = { organizationId: "" }) {
+    const where: Prisma.PatientWhereInput = {
+      organizationId,
+      ...(doctorPatientIds !== undefined ? { id: { in: doctorPatientIds } } : {}),
+      ...(search
+        ? {
+            OR: [
+              { firstName: { contains: search, mode: "insensitive" as const } },
+              { lastName: { contains: search, mode: "insensitive" as const } },
+              { idNumber: { contains: search, mode: "insensitive" as const } },
+            ],
+          }
+        : {}),
+    };
 
     const [patients, total] = await db.$transaction([
       db.patient.findMany({
@@ -77,25 +90,25 @@ const repo: PatientsRepository = {
     return { patients, total };
   },
 
-  findById(id) {
-    return db.patient.findUnique({ where: { id } });
+  findById(id, organizationId) {
+    return db.patient.findFirst({ where: { id, organizationId } });
   },
 
-  findByIdNumber(idNumber) {
-    return db.patient.findUnique({ where: { idNumber } });
+  findByIdNumber(idNumber, organizationId) {
+    return db.patient.findFirst({ where: { idNumber, organizationId } });
   },
 
   create(data) {
     return db.patient.create({ data });
   },
 
-  update(id, data) {
-    return db.patient.update({ where: { id }, data });
+  update(id, organizationId, data) {
+    return db.patient.update({ where: { id }, data: { ...data, organizationId } });
   },
 
-  findFullExport(id) {
-    return db.patient.findUnique({
-      where: { id },
+  findFullExport(id, organizationId) {
+    return db.patient.findFirst({
+      where: { id, organizationId },
       include: {
         appointments: {
           include: {

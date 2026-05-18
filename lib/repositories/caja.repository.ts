@@ -38,19 +38,21 @@ const INCLUDE = {
 
 interface CajaRepository {
   findAll(options?: {
+    organizationId: string;
     search?: string;
     status?: CajaStatus;
     patientId?: string;
     skip?: number;
     take?: number;
   }): Promise<{ records: CajaRecordWithDetails[]; total: number }>;
-  findById(id: string): Promise<CajaRecordWithDetails | null>;
+  findById(id: string, organizationId: string): Promise<CajaRecordWithDetails | null>;
   create(data: {
     patientId: string;
     description: string;
     total: number;
     balance: number;
     status: CajaStatus;
+    organizationId: string;
   }): Promise<CajaRecord>;
   updateBalance(id: string, newBalance: Prisma.Decimal, status: CajaStatus): Promise<CajaRecord>;
   updateInvoice(id: string, data: { invoiceId: string; invoiceNumber: string }): Promise<void>;
@@ -59,8 +61,9 @@ interface CajaRepository {
 }
 
 const repo: CajaRepository = {
-  async findAll({ search, status, patientId, skip = 0, take = 20 } = {}) {
-    const where = {
+  async findAll({ organizationId, search, status, patientId, skip = 0, take = 20 } = { organizationId: "" }) {
+    const where: Prisma.CajaRecordWhereInput = {
+      organizationId,
       ...(status ? { status } : {}),
       ...(patientId ? { patientId } : {}),
       ...(search
@@ -89,8 +92,11 @@ const repo: CajaRepository = {
     return { records: rows.map(toCajaRecordDto), total };
   },
 
-  async findById(id) {
-    const record = await db.cajaRecord.findUnique({ where: { id }, include: INCLUDE });
+  async findById(id, organizationId) {
+    const record = await db.cajaRecord.findFirst({
+      where: { id, organizationId },
+      include: INCLUDE,
+    });
     if (!record) return null;
     return toCajaRecordDto(record);
   },
