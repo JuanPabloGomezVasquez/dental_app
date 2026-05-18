@@ -1,6 +1,7 @@
 import type { Patient } from "@prisma/client";
 import { randomBytes } from "crypto";
 import { patientsRepository } from "@/lib/repositories/patients.repository";
+import { appointmentsRepository } from "@/lib/repositories/appointments.repository";
 import type { CreatePatientInput, UpdatePatientInput } from "@/lib/validations/patient.schema";
 import { NotFoundError, ConflictError } from "@/lib/errors";
 import { encrypt, decrypt, encryptOptional, decryptOptional } from "@/lib/crypto";
@@ -37,12 +38,19 @@ export type PatientExport = {
 };
 
 interface PatientsService {
-  list(options?: { search?: string; page?: number; pageSize?: number }): Promise<PatientPage>;
-  get(id: string): Promise<Patient>;
-  create(data: CreatePatientInput): Promise<Patient>;
-  update(id: string, data: UpdatePatientInput): Promise<Patient>;
-  exportData(id: string): Promise<PatientExport>;
-  anonymize(id: string): Promise<void>;
+  list(options?: {
+    organizationId: string;
+    callerRole: "ADMIN" | "DOCTOR";
+    callerDoctorId: string | null;
+    search?: string;
+    page?: number;
+    pageSize?: number;
+  }): Promise<PatientPage>;
+  get(id: string, organizationId: string): Promise<Patient>;
+  create(data: CreatePatientInput, organizationId: string): Promise<Patient>;
+  update(id: string, organizationId: string, data: UpdatePatientInput): Promise<Patient>;
+  exportData(id: string, organizationId: string): Promise<PatientExport>;
+  anonymize(id: string, organizationId: string): Promise<void>;
 }
 
 function parseBirthDate(birthDate: string | undefined): Date | undefined {
@@ -62,25 +70,40 @@ function decryptPatient(patient: Patient): Patient {
 }
 
 const service: PatientsService = {
-  async list({ search, page = 1, pageSize = 20 } = {}) {
+  async list({ organizationId, callerRole, callerDoctorId, search, page = 1, pageSize = 20 } = {
+    organizationId: "",
+    callerRole: "ADMIN",
+    callerDoctorId: null,
+  }) {
     const skip = (page - 1) * pageSize;
+
+    let doctorPatientIds: string[] | undefined;
+    if (callerRole === "DOCTOR" && callerDoctorId) {
+      doctorPatientIds = await appointmentsRepository.findPatientIdsByDoctor(
+        callerDoctorId,
+        organizationId
+      );
+    }
+
     const { patients, total } = await patientsRepository.findAll({
+      organizationId,
       search: search || undefined,
       skip,
       take: pageSize,
+      doctorPatientIds,
     });
     const pages = Math.ceil(total / pageSize) || 1;
     return { patients: patients.map(decryptPatient), total, page, pages, pageSize };
   },
 
-  async get(id) {
-    const patient = await patientsRepository.findById(id);
+  async get(id, organizationId) {
+    const patient = await patientsRepository.findById(id, organizationId);
     if (!patient) throw new NotFoundError("Paciente no encontrado");
     return decryptPatient(patient);
   },
 
-  async create(data) {
-    const existing = await patientsRepository.findByIdNumber(data.idNumber);
+  async create(data, organizationId) {
+    const existing = await patientsRepository.findByIdNumber(data.idNumber, organizationId);
     if (existing) {
       throw new ConflictError("Ya existe un paciente con ese número de identificación");
     }
@@ -91,6 +114,7 @@ const service: PatientsService = {
     const patient = await patientsRepository.create({
       ...rest,
       birthDate,
+      organizationId,
       phone: encrypt(rest.phone),
       address: encryptOptional(rest.address) ?? undefined,
       guardianName: encryptOptional(rest.guardianName) ?? undefined,
@@ -100,8 +124,8 @@ const service: PatientsService = {
     return decryptPatient(patient);
   },
 
-  async update(id, data) {
-    const existing = await patientsRepository.findById(id);
+  async update(id, organizationId, data) {
+    const existing = await patientsRepository.findById(id, organizationId);
     if (!existing) throw new NotFoundError("Paciente no encontrado");
 
     const { birthDate: birthDateStr, phone, address, guardianName, guardianPhone, ...rest } = data;
@@ -116,11 +140,11 @@ const service: PatientsService = {
       ...("guardianPhone" in data ? { guardianPhone: encryptOptional(guardianPhone) ?? undefined } : {}),
     };
 
-    return decryptPatient(await patientsRepository.update(id, updatePayload));
+    return decryptPatient(await patientsRepository.update(id, organizationId, updatePayload));
   },
 
-  async exportData(id) {
-    const raw = await patientsRepository.findFullExport(id);
+  async exportData(id, organizationId) {
+    const raw = await patientsRepository.findFullExport(id, organizationId);
     if (!raw) throw new NotFoundError("Paciente no encontrado");
 
     const patient = decryptPatient(raw);
@@ -162,8 +186,8 @@ const service: PatientsService = {
     };
   },
 
-  async anonymize(id) {
-    const existing = await patientsRepository.findById(id);
+  async anonymize(id, organizationId) {
+    const existing = await patientsRepository.findById(id, organizationId);
     if (!existing) throw new NotFoundError("Paciente no encontrado");
 
     await patientsRepository.anonymize(id, {

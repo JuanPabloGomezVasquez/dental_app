@@ -11,29 +11,38 @@ const DAY_START_HOUR = 8
 const DAY_END_HOUR = 18
 
 interface AppointmentsService {
-  listByDateRange(start: Date, end: Date, doctorId?: string): Promise<AppointmentWithRelations[]>
-  get(id: string): Promise<AppointmentWithRelations>
-  create(data: CreateAppointmentInput): Promise<AppointmentWithRelations>
-  cancel(id: string): Promise<void>
+  listByDateRange(
+    start: Date,
+    end: Date,
+    organizationId: string,
+    callerRole: "ADMIN" | "DOCTOR",
+    callerDoctorId: string | null,
+    filterDoctorId?: string
+  ): Promise<AppointmentWithRelations[]>
+  get(id: string, organizationId: string): Promise<AppointmentWithRelations>
+  create(data: CreateAppointmentInput, organizationId: string): Promise<AppointmentWithRelations>
+  cancel(id: string, organizationId: string): Promise<void>
   getAvailableSlots(doctorId: string, dateStr: string): Promise<string[]>
 }
 
 const service: AppointmentsService = {
-  listByDateRange(start, end, doctorId) {
-    return appointmentsRepository.findByDateRange(start, end, doctorId)
+  listByDateRange(start, end, organizationId, callerRole, callerDoctorId, filterDoctorId) {
+    const doctorId =
+      callerRole === "DOCTOR" && callerDoctorId ? callerDoctorId : filterDoctorId
+    return appointmentsRepository.findByDateRange(start, end, organizationId, doctorId)
   },
 
-  async get(id) {
-    const apt = await appointmentsRepository.findById(id)
+  async get(id, organizationId) {
+    const apt = await appointmentsRepository.findById(id, organizationId)
     if (!apt) throw new NotFoundError("Cita no encontrada")
     return apt
   },
 
-  async create(data) {
+  async create(data, organizationId) {
     const [patient, doctor, procedure] = await Promise.all([
-      patientsRepository.findById(data.patientId),
-      doctorsRepository.findById(data.doctorId),
-      proceduresRepository.findById(data.procedureId),
+      patientsRepository.findById(data.patientId, organizationId),
+      doctorsRepository.findById(data.doctorId, organizationId),
+      proceduresRepository.findById(data.procedureId, organizationId),
     ])
 
     if (!patient)   throw new NotFoundError("Paciente no encontrado")
@@ -65,6 +74,7 @@ const service: AppointmentsService = {
       doctorId:    data.doctorId,
       procedureId: data.procedureId,
       date:        appointmentDate,
+      organizationId,
     })
 
     try {
@@ -87,11 +97,11 @@ const service: AppointmentsService = {
     return appointment
   },
 
-  async cancel(id) {
-    const apt = await appointmentsRepository.findById(id)
+  async cancel(id, organizationId) {
+    const apt = await appointmentsRepository.findById(id, organizationId)
     if (!apt) throw new NotFoundError("Cita no encontrada")
 
-    await appointmentsRepository.delete(id)
+    await appointmentsRepository.delete(id, organizationId)
 
     if (apt.reminderJobId) {
       try {

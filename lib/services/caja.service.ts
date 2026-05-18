@@ -15,17 +15,19 @@ export type CajaPage = {
 };
 
 interface CajaService {
-  list(options?: {
+  list(options: {
+    organizationId: string;
     search?: string;
     status?: string;
     patientId?: string;
     page?: number;
     pageSize?: number;
   }): Promise<CajaPage>;
-  get(id: string): Promise<CajaRecordWithDetails>;
-  create(data: CreateCajaRecordInput): Promise<CajaRecordWithDetails>;
+  get(id: string, organizationId: string): Promise<CajaRecordWithDetails>;
+  create(data: CreateCajaRecordInput, organizationId: string): Promise<CajaRecordWithDetails>;
   addPayment(
     cajaRecordId: string,
+    organizationId: string,
     data: CreatePaymentInput
   ): Promise<{ record: CajaRecordWithDetails; payment: Payment }>;
 }
@@ -37,12 +39,13 @@ function calculateStatus(total: Prisma.Decimal, balance: Prisma.Decimal): CajaSt
 }
 
 const service: CajaService = {
-  async list({ search, status, patientId, page = 1, pageSize = 20 } = {}) {
+  async list({ organizationId, search, status, patientId, page = 1, pageSize = 20 }) {
     const skip = (page - 1) * pageSize;
     const validStatuses = Object.values(CajaStatus) as string[];
     const cajaStatus =
       status && validStatuses.includes(status) ? (status as CajaStatus) : undefined;
     const { records, total } = await cajaRepository.findAll({
+      organizationId,
       search,
       status: cajaStatus,
       patientId,
@@ -53,14 +56,14 @@ const service: CajaService = {
     return { records, total, page, pages, pageSize };
   },
 
-  async get(id) {
-    const record = await cajaRepository.findById(id);
+  async get(id, organizationId) {
+    const record = await cajaRepository.findById(id, organizationId);
     if (!record) throw new NotFoundError("Registro de caja no encontrado");
     return record;
   },
 
-  async create(data) {
-    const patient = await patientsRepository.findById(data.patientId);
+  async create(data, organizationId) {
+    const patient = await patientsRepository.findById(data.patientId, organizationId);
     if (!patient) throw new NotFoundError("Paciente no encontrado");
 
     const total = new Prisma.Decimal(data.total);
@@ -74,6 +77,7 @@ const service: CajaService = {
       total: data.total,
       balance: balance.toNumber(),
       status,
+      organizationId,
     });
 
     if (data.initialPayment && data.initialPayment > 0 && data.paymentMethod) {
@@ -84,11 +88,11 @@ const service: CajaService = {
       });
     }
 
-    return (await cajaRepository.findById(record.id))!;
+    return (await cajaRepository.findById(record.id, organizationId))!;
   },
 
-  async addPayment(cajaRecordId, data) {
-    const record = await cajaRepository.findById(cajaRecordId);
+  async addPayment(cajaRecordId, organizationId, data) {
+    const record = await cajaRepository.findById(cajaRecordId, organizationId);
     if (!record) throw new NotFoundError("Registro de caja no encontrado");
 
     const currentBalance = new Prisma.Decimal(record.balance);
@@ -112,7 +116,7 @@ const service: CajaService = {
     if (newStatus === CajaStatus.PAGADO) {
       try {
         const [patient, payments] = await Promise.all([
-          patientsService.get(record.patientId),
+          patientsService.get(record.patientId, organizationId),
           cajaRepository.getPaymentsByRecord(cajaRecordId),
         ]);
         const result = await createInvoice({
@@ -137,7 +141,7 @@ const service: CajaService = {
       }
     }
 
-    const updated = (await cajaRepository.findById(cajaRecordId))!;
+    const updated = (await cajaRepository.findById(cajaRecordId, organizationId))!;
     return { record: updated, payment };
   },
 };

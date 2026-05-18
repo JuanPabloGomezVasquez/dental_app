@@ -13,5 +13,11 @@ export const toggleDoctorSchema = z.object({
   active: z.boolean(),
 });
 
+export const enableLoginSchema = z.object({
+  email: z.string().email("Email inválido"),
+  initialPassword: z.string().min(8, "La contraseña debe tener al menos 8 caracteres"),
+});
+
 export type CreateDoctorInput = z.infer<typeof createDoctorSchema>;
 export type UpdateDoctorInput = z.infer<typeof updateDoctorSchema>;
+export type EnableLoginInput = z.infer<typeof enableLoginSchema>;
