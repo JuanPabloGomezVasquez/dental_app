@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { verifySession } from "@/lib/dal";
+import { verifySession, assertAdmin } from "@/lib/dal";
 import { buildRipsJson } from "@/lib/integrations/rips/mapper";
 import { handleApiError } from "@/lib/errors";
 
@@ -11,7 +11,8 @@ const querySchema = z.object({
 });
 
 export async function GET(req: Request): Promise<Response> {
-  await verifySession();
+  const session = await verifySession();
+  assertAdmin(session.role);
 
   const { searchParams } = new URL(req.url);
   const parsed = querySchema.safeParse({
@@ -37,7 +38,7 @@ export async function GET(req: Request): Promise<Response> {
   }
 
   try {
-    const ripsJson = await buildRipsJson(dateFrom, dateTo);
+    const ripsJson = await buildRipsJson(dateFrom, dateTo, session.organizationId);
     return new Response(JSON.stringify(ripsJson, null, 2), {
       headers: {
         "Content-Type": "application/json",

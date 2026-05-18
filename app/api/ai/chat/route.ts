@@ -1,4 +1,5 @@
 import { verifySession } from "@/lib/dal";
+import { getAccessibleModules, assertModuleAccess, AppModule } from "@/lib/modules";
 import { createAgentStream } from "@/lib/services/ai-agent.service";
 import type { ChatMessage, ToolCall } from "@/lib/integrations/anthropic/types";
 
@@ -8,7 +9,9 @@ type ChatRequestBody = {
 };
 
 export async function POST(req: Request): Promise<Response> {
-  await verifySession();
+  const session = await verifySession();
+  const accessible = await getAccessibleModules(session.organizationId, session.role, session.doctorId);
+  assertModuleAccess(accessible, AppModule.AI_ASSISTANT);
 
   const body = (await req.json()) as ChatRequestBody;
 
@@ -19,6 +22,11 @@ export async function POST(req: Request): Promise<Response> {
   const stream = createAgentStream({
     messages: body.messages,
     confirmedToolCall: body.confirmedToolCall,
+    context: {
+      organizationId: session.organizationId,
+      callerRole: session.role,
+      callerDoctorId: session.doctorId,
+    },
   });
 
   return new Response(stream, {

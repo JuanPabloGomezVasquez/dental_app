@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { verifySession } from "@/lib/dal";
+import { verifySession, assertAdmin } from "@/lib/dal";
 import { proceduresService } from "@/lib/services/procedures.service";
 import { updateProcedureSchema, toggleProcedureSchema } from "@/lib/validations/procedure.schema";
 import { handleApiError } from "@/lib/errors";
@@ -10,11 +10,12 @@ export async function GET(
   _req: NextRequest,
   ctx: { params: Params }
 ): Promise<Response> {
-  await verifySession();
+  const session = await verifySession();
+  assertAdmin(session.role);
   const { id } = await ctx.params;
 
   try {
-    const procedure = await proceduresService.get(id);
+    const procedure = await proceduresService.get(id, session.organizationId);
     return Response.json(procedure);
   } catch (error) {
     return handleApiError(error);
@@ -25,7 +26,8 @@ export async function PUT(
   req: NextRequest,
   ctx: { params: Params }
 ): Promise<Response> {
-  await verifySession();
+  const session = await verifySession();
+  assertAdmin(session.role);
   const { id } = await ctx.params;
 
   const body: unknown = await req.json();
@@ -38,7 +40,7 @@ export async function PUT(
   }
 
   try {
-    const procedure = await proceduresService.update(id, parsed.data);
+    const procedure = await proceduresService.update(id, session.organizationId, parsed.data);
     return Response.json(procedure);
   } catch (error) {
     return handleApiError(error);
@@ -49,7 +51,8 @@ export async function PATCH(
   req: NextRequest,
   ctx: { params: Params }
 ): Promise<Response> {
-  await verifySession();
+  const session = await verifySession();
+  assertAdmin(session.role);
   const { id } = await ctx.params;
 
   const body: unknown = await req.json();
@@ -62,7 +65,7 @@ export async function PATCH(
   }
 
   try {
-    const procedure = await proceduresService.setActive(id, parsed.data.active);
+    const procedure = await proceduresService.setActive(id, session.organizationId, parsed.data.active);
     return Response.json(procedure);
   } catch (error) {
     return handleApiError(error);

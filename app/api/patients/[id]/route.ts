@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
-import { verifySession } from "@/lib/dal";
+import { verifySession, assertAdmin } from "@/lib/dal";
+import { getAccessibleModules, assertModuleAccess, AppModule } from "@/lib/modules";
 import { patientsService } from "@/lib/services/patients.service";
 import { updatePatientSchema } from "@/lib/validations/patient.schema";
 import { handleApiError } from "@/lib/errors";
@@ -10,11 +11,13 @@ export async function GET(
   _req: NextRequest,
   ctx: { params: Params }
 ): Promise<Response> {
-  await verifySession();
+  const session = await verifySession();
+  const accessible = await getAccessibleModules(session.organizationId, session.role, session.doctorId);
+  assertModuleAccess(accessible, AppModule.PATIENTS);
   const { id } = await ctx.params;
 
   try {
-    const patient = await patientsService.get(id);
+    const patient = await patientsService.get(id, session.organizationId);
     return Response.json(patient);
   } catch (error) {
     return handleApiError(error);
@@ -25,7 +28,8 @@ export async function PUT(
   req: NextRequest,
   ctx: { params: Params }
 ): Promise<Response> {
-  await verifySession();
+  const session = await verifySession();
+  assertAdmin(session.role);
   const { id } = await ctx.params;
 
   const body: unknown = await req.json();
@@ -38,7 +42,7 @@ export async function PUT(
   }
 
   try {
-    const patient = await patientsService.update(id, parsed.data);
+    const patient = await patientsService.update(id, session.organizationId, parsed.data);
     return Response.json(patient);
   } catch (error) {
     return handleApiError(error);

@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { verifySession } from "@/lib/dal";
+import { getAccessibleModules, assertModuleAccess, AppModule } from "@/lib/modules";
 import { clinicalHistoryService } from "@/lib/services/clinical-history.service";
 import { createOdontogramEntrySchema } from "@/lib/validations/clinical-history.schema";
 import { handleApiError } from "@/lib/errors";
@@ -10,7 +11,9 @@ export async function POST(
   req: NextRequest,
   ctx: { params: Params }
 ): Promise<Response> {
-  await verifySession();
+  const session = await verifySession();
+  const accessible = await getAccessibleModules(session.organizationId, session.role, session.doctorId);
+  assertModuleAccess(accessible, AppModule.PATIENTS);
   const { id } = await ctx.params;
 
   const body: unknown = await req.json();
@@ -34,7 +37,9 @@ export async function DELETE(
   req: NextRequest,
   ctx: { params: Params }
 ): Promise<Response> {
-  await verifySession();
+  const session = await verifySession();
+  const accessible = await getAccessibleModules(session.organizationId, session.role, session.doctorId);
+  assertModuleAccess(accessible, AppModule.PATIENTS);
   const { id } = await ctx.params;
   const entryId = req.nextUrl.searchParams.get("entryId");
 

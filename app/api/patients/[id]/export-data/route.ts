@@ -1,15 +1,16 @@
-import { verifySession } from "@/lib/dal";
+import { verifySession, assertAdmin } from "@/lib/dal";
 import { patientsService } from "@/lib/services/patients.service";
 import { handleApiError, NotFoundError } from "@/lib/errors";
 
 type Params = Promise<{ id: string }>;
 
 export async function GET(_req: Request, ctx: { params: Params }): Promise<Response> {
-  await verifySession();
+  const session = await verifySession();
+  assertAdmin(session.role);
   const { id } = await ctx.params;
 
   try {
-    const exportData = await patientsService.exportData(id);
+    const exportData = await patientsService.exportData(id, session.organizationId);
     const filename = `datos-paciente-${exportData.patient.idNumber}.json`;
     return new Response(JSON.stringify(exportData, null, 2), {
       headers: {

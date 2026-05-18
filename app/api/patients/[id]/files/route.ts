@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { put } from "@vercel/blob";
 import { verifySession } from "@/lib/dal";
+import { getAccessibleModules, assertModuleAccess, AppModule } from "@/lib/modules";
 import { clinicalHistoryService } from "@/lib/services/clinical-history.service";
 import { handleApiError } from "@/lib/errors";
 
@@ -17,7 +18,9 @@ export async function POST(
   req: NextRequest,
   ctx: { params: Params }
 ): Promise<Response> {
-  await verifySession();
+  const session = await verifySession();
+  const accessible = await getAccessibleModules(session.organizationId, session.role, session.doctorId);
+  assertModuleAccess(accessible, AppModule.PATIENTS);
   const { id } = await ctx.params;
 
   const formData = await req.formData();
@@ -53,7 +56,9 @@ export async function DELETE(
   req: NextRequest,
   ctx: { params: Params }
 ): Promise<Response> {
-  await verifySession();
+  const session = await verifySession();
+  const accessible = await getAccessibleModules(session.organizationId, session.role, session.doctorId);
+  assertModuleAccess(accessible, AppModule.PATIENTS);
   const { id } = await ctx.params;
   const fileId = req.nextUrl.searchParams.get("fileId");
 

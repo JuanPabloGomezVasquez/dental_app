@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { verifySession } from "@/lib/dal";
+import { getAccessibleModules, assertModuleAccess, AppModule } from "@/lib/modules";
 import { inventoryService } from "@/lib/services/inventory.service";
 import {
   updateInventoryItemSchema,
@@ -13,11 +14,13 @@ export async function GET(
   _req: NextRequest,
   ctx: { params: Params }
 ): Promise<Response> {
-  await verifySession();
+  const session = await verifySession();
+  const accessible = await getAccessibleModules(session.organizationId, session.role, session.doctorId);
+  assertModuleAccess(accessible, AppModule.INVENTORY);
   const { id } = await ctx.params;
 
   try {
-    const item = await inventoryService.get(id);
+    const item = await inventoryService.get(id, session.organizationId);
     return Response.json(item);
   } catch (error) {
     return handleApiError(error);
@@ -28,7 +31,9 @@ export async function PUT(
   req: NextRequest,
   ctx: { params: Params }
 ): Promise<Response> {
-  await verifySession();
+  const session = await verifySession();
+  const accessible = await getAccessibleModules(session.organizationId, session.role, session.doctorId);
+  assertModuleAccess(accessible, AppModule.INVENTORY);
   const { id } = await ctx.params;
 
   const body: unknown = await req.json();
@@ -41,7 +46,7 @@ export async function PUT(
   }
 
   try {
-    const item = await inventoryService.update(id, parsed.data);
+    const item = await inventoryService.update(id, session.organizationId, parsed.data);
     return Response.json(item);
   } catch (error) {
     return handleApiError(error);
@@ -52,7 +57,9 @@ export async function PATCH(
   req: NextRequest,
   ctx: { params: Params }
 ): Promise<Response> {
-  await verifySession();
+  const session = await verifySession();
+  const accessible = await getAccessibleModules(session.organizationId, session.role, session.doctorId);
+  assertModuleAccess(accessible, AppModule.INVENTORY);
   const { id } = await ctx.params;
 
   const body: unknown = await req.json();
@@ -65,7 +72,7 @@ export async function PATCH(
   }
 
   try {
-    await inventoryService.setActive(id, parsed.data.active);
+    await inventoryService.setActive(id, session.organizationId, parsed.data.active);
     return new Response(null, { status: 204 });
   } catch (error) {
     return handleApiError(error);
