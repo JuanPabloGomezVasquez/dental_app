@@ -1,10 +1,11 @@
 import { test, expect } from "@playwright/test";
-import { db } from "../fixtures/db";
+import { db, getDefaultOrgId } from "../fixtures/db";
 
 test.describe("Flujo: registro de pago completo", () => {
   let patientId: string | undefined;
 
   test.beforeAll(async () => {
+    const organizationId = await getDefaultOrgId();
     const patient = await db.patient.create({
       data: {
         firstName: "Paciente",
@@ -12,6 +13,7 @@ test.describe("Flujo: registro de pago completo", () => {
         idNumber: `CAJA-${Date.now()}`,
         phone: "3009999999",
         habeaDataConsent: true,
+        organizationId,
       },
     });
     patientId = patient.id;

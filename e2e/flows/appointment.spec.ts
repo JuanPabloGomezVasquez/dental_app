@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { db } from "../fixtures/db";
+import { db, getDefaultOrgId } from "../fixtures/db";
 
 test.describe("Flujo: crear paciente y agendar cita", () => {
   let createdPatientId: string | undefined;
@@ -7,11 +7,12 @@ test.describe("Flujo: crear paciente y agendar cita", () => {
   let procedureId: string | undefined;
 
   test.beforeAll(async () => {
+    const organizationId = await getDefaultOrgId();
     const doctor = await db.doctor.create({
-      data: { name: "Dr. Playwright", specialty: "Odontología General", active: true },
+      data: { name: "Dr. Playwright", specialty: "Odontología General", active: true, organizationId },
     });
     const procedure = await db.procedure.create({
-      data: { name: "Revisión E2E", active: true },
+      data: { name: "Revisión E2E", active: true, organizationId },
     });
     doctorId = doctor.id;
     procedureId = procedure.id;

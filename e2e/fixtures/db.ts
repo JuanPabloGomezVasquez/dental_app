@@ -5,6 +5,11 @@ const db = new PrismaClient({
   datasources: { db: { url: process.env.DATABASE_URL_TEST ?? process.env.DATABASE_URL } },
 });
 
+async function getDefaultOrgId(): Promise<string> {
+  const org = await db.organization.findFirstOrThrow({ where: { active: true } });
+  return org.id;
+}
+
 type DbFixtures = {
   seedDoctor: { id: string; name: string };
   seedProcedure: { id: string; name: string };
@@ -13,22 +18,25 @@ type DbFixtures = {
 
 export const test = base.extend<DbFixtures>({
   seedDoctor: async ({}, use) => {
+    const organizationId = await getDefaultOrgId();
     const doctor = await db.doctor.create({
-      data: { name: "Dr. Test E2E", specialty: "Odontología General", active: true },
+      data: { name: "Dr. Test E2E", specialty: "Odontología General", active: true, organizationId },
     });
     await use(doctor);
     await db.doctor.delete({ where: { id: doctor.id } }).catch(() => undefined);
   },
 
   seedProcedure: async ({}, use) => {
+    const organizationId = await getDefaultOrgId();
     const procedure = await db.procedure.create({
-      data: { name: "Limpieza E2E", active: true },
+      data: { name: "Limpieza E2E", active: true, organizationId },
     });
     await use(procedure);
     await db.procedure.delete({ where: { id: procedure.id } }).catch(() => undefined);
   },
 
   seedPatient: async ({}, use) => {
+    const organizationId = await getDefaultOrgId();
     const patient = await db.patient.create({
       data: {
         firstName: "Paciente",
@@ -36,6 +44,7 @@ export const test = base.extend<DbFixtures>({
         idNumber: `TEST-${Date.now()}`,
         phone: "3001234567",
         habeaDataConsent: true,
+        organizationId,
       },
     });
     await use(patient);
@@ -43,4 +52,4 @@ export const test = base.extend<DbFixtures>({
   },
 });
 
-export { db };
+export { db, getDefaultOrgId };

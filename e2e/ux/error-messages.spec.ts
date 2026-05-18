@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { db } from "../fixtures/db";
+import { db, getDefaultOrgId } from "../fixtures/db";
 
 test.describe("Mensajes de error en español", () => {
   test("formulario de paciente muestra errores en español", async ({ page }) => {
@@ -16,6 +16,7 @@ test.describe("Mensajes de error en español", () => {
 
   test("error de cédula duplicada muestra mensaje claro", async ({ page }) => {
     const idNumber = `DUP-${Date.now()}`;
+    const organizationId = await getDefaultOrgId();
     await db.patient.create({
       data: {
         firstName: "Existente",
@@ -23,6 +24,7 @@ test.describe("Mensajes de error en español", () => {
         idNumber,
         phone: "3001111111",
         habeaDataConsent: true,
+        organizationId,
       },
     });
 
