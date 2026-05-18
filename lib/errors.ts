@@ -29,6 +29,13 @@ export class ConflictError extends AppError {
   }
 }
 
+export class ForbiddenError extends AppError {
+  constructor(message: string = "Acceso denegado") {
+    super(message, 403);
+    this.name = "ForbiddenError";
+  }
+}
+
 export function handleApiError(error: unknown): Response {
   if (error instanceof AppError) {
     return Response.json(
