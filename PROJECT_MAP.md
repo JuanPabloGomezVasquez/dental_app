@@ -22,9 +22,10 @@ lib/db.ts (PrismaClient singleton)
 - Services never import `db` directly
 - API routes contain no business logic
 - PII encryption happens **only** in the patients repository (`phone`, `email`, `address`, `guardianPhone`)
-- `lib/dal.ts` → `verifySession()` protects all dashboard routes (cached with `React.cache`)
+- `lib/dal.ts` → `verifySession()` protects all dashboard routes; `verifySuperAdmin()` protects `/superadmin/**` routes (both cached with `React.cache`)
 - Every DB query includes `organizationId` — tenant data never leaks across orgs
 - `lib/modules.ts` is `server-only`; `lib/module-metadata.ts` is client-safe (sidebar imports it)
+- `SUPER_ADMIN` users have `organizationId = null`; `verifySession()` rejects them; `verifySuperAdmin()` accepts only them
 
 ---
 
@@ -56,19 +57,36 @@ Two-level gate:
 
 **Client-safe metadata** (`lib/module-metadata.ts`): `MODULE_METADATA`, `MODULE_ORDER`, `DASHBOARD_METADATA` — imported by Sidebar and dashboard page without violating `server-only`.
 
-### Session Payload (updated shape)
+### Session Payload (current shape)
 
 ```typescript
+// lib/session.ts
 type SessionPayload = {
   userId: string;
   email: string;
   name: string;
-  role: "ADMIN" | "DOCTOR";
-  organizationId: string;
+  role: "SUPER_ADMIN" | "ADMIN" | "DOCTOR";
+  organizationId: string | null;   // null for SUPER_ADMIN
   doctorId: string | null;
   expiresAt: Date;
 };
+
+// lib/dal.ts — two session types to keep dashboard code clean
+type DashboardSessionUser = {
+  userId: string; email: string; name: string;
+  role: "ADMIN" | "DOCTOR";
+  organizationId: string;   // guaranteed non-null after verifySession
+  doctorId: string | null;
+};
+
+type SuperAdminSessionUser = {
+  userId: string; email: string; name: string;
+  role: "SUPER_ADMIN";
+};
 ```
+
+- `verifySession()` → `DashboardSessionUser`: redirects to `/login` if missing `organizationId` OR if role is `SUPER_ADMIN`
+- `verifySuperAdmin()` → `SuperAdminSessionUser`: redirects to `/login` if role ≠ `SUPER_ADMIN`
 
 Old sessions missing `organizationId` → `verifySession()` redirects to `/login` (one-time re-login).
 
@@ -78,6 +96,44 @@ Old sessions missing `organizationId` → `verifySession()` redirects to `/login
 - Admin disables login: DELETE same route — deletes the User record
 - On login (`app/actions/auth.ts`): detects role → if DOCTOR, calls `getAccessibleModules`, finds first module, redirects to its route or `/no-access`
 - `/no-access` page (`app/(dashboard)/no-access/page.tsx`): shown when doctor has zero accessible modules
+
+---
+
+## Super Admin Panel
+
+**Route group:** `app/(superadmin)/` — isolated layout, `verifySuperAdmin()` only, no shared code with dashboard
+
+**Routes:**
+| Route | Handler |
+|---|---|
+| `GET /superadmin/organizations` | `app/(superadmin)/superadmin/organizations/page.tsx` — org list |
+| `GET /superadmin/organizations/new` | `app/(superadmin)/superadmin/organizations/new/page.tsx` — create form |
+| `GET /superadmin/organizations/[id]` | `app/(superadmin)/superadmin/organizations/[id]/page.tsx` — detail |
+| `GET /api/superadmin/organizations` | List all orgs with counts and enabled modules |
+| `POST /api/superadmin/organizations` | Create org (validates slug + email uniqueness, atomic tx) |
+| `GET /api/superadmin/organizations/[id]` | Org detail with all 5 modules |
+| `PUT /api/superadmin/organizations/[id]` | Update name or active status |
+| `PUT /api/superadmin/organizations/[id]/modules` | Toggle a module on/off (cascade disable to doctor perms) |
+
+**Client components (`components/superadmin/`):**
+- `org-list-client.tsx` — org table with active badge, user/doctor/patient counts, module chips
+- `org-form.tsx` — create form; POST to API, toast + redirect on success
+- `org-detail-client.tsx` — module toggle switches (optimistic + rollback) + suspend/activate button
+
+**Service (`lib/services/superadmin.service.ts`):**
+- `listOrganizations()` — DTOs with counts and `enabledModules[]`
+- `getOrgDetail(orgId)` — throws `NotFoundError`; fills all 5 modules (disabled if absent in DB)
+- `createOrganization(data)` — slug+email uniqueness check; `db.$transaction(org + user + 5 OrgModule rows)`
+- `updateOrganization(orgId, data)` — guards `NotFoundError` before update
+- `setOrgModule(orgId, module, enabled)` — upserts OrgModule; if disabling, cascades to `DoctorModulePermission.updateMany`
+
+**Repository (`lib/repositories/superadmin.repository.ts`):** listOrganizations, findById, slugExists, create, update, setModule
+
+**Validation (`lib/validations/organization.schema.ts`):** `createOrganizationSchema`, `updateOrganizationSchema`, `setOrgModuleSchema`
+
+**Suspended org enforcement:** `app/actions/auth.ts` checks `org.active` after credential validation; returns an error string if false — suspended clinic users cannot log in.
+
+**Clinic admin restriction:** `PUT /api/admin/org-modules` returns 403. The `/admin/settings` page is now read-only (static status badges, no toggles).
 
 ---
 
@@ -105,7 +161,7 @@ Old sessions missing `organizationId` → `verifySession()` redirects to `/login
 - `doctor-form.tsx` — when editing: collapsible "Acceso al sistema" section to enable/disable login and set initial password
 - `doctor-permissions-panel.tsx` — slide-in panel; toggles per-module grants; disabled when org hasn't enabled that module
 - `doctor-table.tsx` — table row; "Permisos" action column button
-- `org-module-settings.tsx` — org-level module toggle UI with optimistic updates
+- `org-module-settings.tsx` — read-only module status view (toggles removed; only super admin can change org modules)
 - `procedures-page-client.tsx` — same for procedures, includes CUPS code field
 - `rips-export-form.tsx` — date range form for RIPS export
 
@@ -116,7 +172,7 @@ Old sessions missing `organizationId` → `verifySession()` redirects to `/login
 - `POST /api/admin/doctors/[id]/login` — enable doctor login (creates linked User)
 - `DELETE /api/admin/doctors/[id]/login` — disable doctor login (deletes User)
 - `GET/PUT /api/admin/doctors/[id]/modules` — get / set doctor module permissions
-- `GET/PUT /api/admin/org-modules` — org-level module configuration
+- `GET /api/admin/org-modules` — read org-level module config (PUT returns 403 — only super admin can change)
 - Same pattern for `/api/admin/procedures`
 - `GET /api/rips/export?from=&to=` — generates RIPS JSON
 
@@ -325,7 +381,7 @@ Old sessions missing `organizationId` → `verifySession()` redirects to `/login
 |---|---|
 | `lib/db.ts` | PrismaClient singleton (hot-reload safe) |
 | `lib/session.ts` | JWT HS256 — `createSession()`, `deleteSession()`, `encrypt()`, `decrypt()` |
-| `lib/dal.ts` | `verifySession()` — auth guard with React.cache; `verifyAdmin()` — ADMIN-only guard |
+| `lib/dal.ts` | `verifySession()` → `DashboardSessionUser` (blocks SUPER_ADMIN); `verifySuperAdmin()` → `SuperAdminSessionUser`; `assertAdmin()` — ADMIN-only guard within dashboard |
 | `lib/crypto.ts` | AES-256-GCM field encryption |
 | `lib/errors.ts` | `AppError`, `ValidationError`, `NotFoundError`, `ConflictError`, `ForbiddenError`, `handleApiError()` |
 | `lib/env.ts` | Validates optional env vars in production (warn, no throw) |
@@ -371,7 +427,7 @@ InventoryCategory → InventoryItem → StockLog[]   (all with organizationId)
 ```
 
 **Key enums:**
-- `UserRole`: ADMIN, DOCTOR
+- `UserRole`: SUPER_ADMIN, ADMIN, DOCTOR
 - `AppModule`: APPOINTMENTS, PATIENTS, INVENTORY, CAJA, AI_ASSISTANT
 - `NoteType`: INGRESO, EVOLUCION, PROCEDIMIENTO, INTERCONSULTA, EGRESO
 - `Surface`: OCLUSAL, MESIAL, DISTAL, VESTIBULAR, LINGUAL
@@ -399,6 +455,7 @@ InventoryCategory → InventoryItem → StockLog[]   (all with organizationId)
 | `tests/unit/services/org-modules.service.test.ts` | `getOrgModules` fills missing modules with false; `setOrgModule(false)` cascades disable to doctors; `getDoctorModulePerms` combines org + doctor state; `setDoctorModulePerm` rejects when org module disabled |
 | `tests/unit/services/appointments.service.test.ts` | DOCTOR always uses own doctorId (ignores filterDoctorId); ADMIN without filter → undefined; organizationId forwarded to repository |
 | `tests/unit/services/patients.service.test.ts` | DOCTOR fetches patientIds from appointments first; ADMIN does not; correct pagination (pages = ceil(total/pageSize)) |
+| `tests/unit/services/superadmin.service.test.ts` | `listOrganizations` maps counts + enabledModules; `getOrgDetail` fills all modules; `createOrganization` checks slug+email uniqueness, creates all 5 OrgModule rows; `updateOrganization` guards NotFoundError; `setOrgModule` cascades disable to doctor perms |
 
 **Mock contract:** Prisma queries filter with `where: { enabled: true }` — mocks must only return enabled=true rows to accurately simulate DB behavior.
 
@@ -416,6 +473,7 @@ InventoryCategory → InventoryItem → StockLog[]   (all with organizationId)
 - `e2e/flows/payment.spec.ts` — creates billing record + full payment cycle
 - `e2e/flows/module-gating.spec.ts` — sidebar shows/hides Caja link when module toggled; direct URL to disabled module → 403; admin panel always accessible; afterAll re-enables CAJA
 - `e2e/flows/doctor-login.spec.ts` — `test.use({ storageState: { cookies: [], origins: [] } })` (no admin session); creates Doctor + User via Prisma; doctor with no modules → `/no-access`; doctor with APPOINTMENTS → `/appointments`
+- `e2e/flows/superadmin.spec.ts` — super admin login → `/superadmin/organizations`; clinic admin blocked from superadmin routes; org creation (slug + admin user); module toggle persists in DB; org suspension/activation; suspended org blocks user login
 - `e2e/a11y/accessibility.spec.ts` — axe-playwright, WCAG 2.1 A/AA, critical/serious impacts only
 - `e2e/ux/error-messages.spec.ts` — Spanish error messages, duplicate ID number
 - `e2e/ux/responsive.spec.ts` — patient/inventory/billing tables visible at 768px
@@ -464,6 +522,7 @@ InventoryCategory → InventoryItem → StockLog[]   (all with organizationId)
 
 - Creates default Organization: `Clínica Dental` (slug: `clinica-dental`)
 - Creates admin user: `admin@clinica.com` / `admin123` (bcrypt cost 12, role=ADMIN, linked to org)
+- Creates super admin user: `superadmin@dentapp.com` / `superadmin123` (role=SUPER_ADMIN, `organizationId=null`)
 - Creates all 5 OrgModules enabled: APPOINTMENTS, PATIENTS, INVENTORY, CAJA, AI_ASSISTANT
 - Creates 7 inventory categories: Anestesia, Material Dental, Instrumental, Medicamentos, Radiología, Protección Personal, Administrativo (all linked to org)
 - Idempotent: uses `upsert`

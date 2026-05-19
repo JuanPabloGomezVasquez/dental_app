@@ -9,7 +9,8 @@ A full-stack practice management system for dental clinics built with Next.js 16
 | Module | Description |
 |---|---|
 | **Multi-tenancy** | Each clinic is an isolated tenant (Organization); all data scoped by `organizationId`; module activation per clinic |
-| **Authentication** | JWT sessions with bcrypt password hashing, HTTP-only cookies, 7-day expiry; `ADMIN` and `DOCTOR` roles |
+| **Super Admin Panel** | Platform-owner panel at `/superadmin`; create/suspend organizations, configure contracted modules per clinic |
+| **Authentication** | JWT sessions with bcrypt password hashing, HTTP-only cookies, 7-day expiry; `SUPER_ADMIN`, `ADMIN`, and `DOCTOR` roles |
 | **Module Gating** | Two-level: org enables modules (contracted features), doctor gets granted subset; sidebar and routes enforce access |
 | **Doctor Login** | Doctors log in via the same `/login` page; redirected to first accessible module or `/no-access`; managed by admin |
 | **Administration** | Doctors and procedures CRUD with soft-delete and active/inactive toggle; doctor login and module permission management |
@@ -85,6 +86,16 @@ Key conventions:
 - External integrations are isolated in `lib/integrations/`
 - Every data-access call carries `organizationId` — full tenant isolation at the DB layer
 - `lib/modules.ts` (`server-only`) gates access; `lib/module-metadata.ts` (client-safe) holds display metadata
+- Super admin routes (`/superadmin/**`) live under the `(superadmin)` route group with its own layout; they call `verifySuperAdmin()` and never share code with the clinic dashboard
+
+### Super Admin Panel
+
+The platform owner (role `SUPER_ADMIN`) manages all clinics from `/superadmin/organizations`. The panel lets the owner:
+- Create new organizations (atomically creates org + admin user + all 5 OrgModule rows in one transaction)
+- Suspend or reactivate organizations (suspended org users cannot log in)
+- Toggle which AppModules a clinic has contracted (cascades: disabling a module also revokes all DoctorModulePermissions for that module)
+
+`SUPER_ADMIN` users have `organizationId = null`. `verifySession()` blocks them from the clinic dashboard; `verifySuperAdmin()` blocks everyone else from the super admin panel.
 
 ### Multi-tenancy & Module Gating
 
@@ -146,12 +157,12 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-**Default admin credentials** (created by the seed):
+**Default credentials** (created by the seed):
 
-| Field | Value |
-|---|---|
-| Email | `admin@clinica.com` |
-| Password | `admin123` |
+| Role | Email | Password |
+|---|---|---|
+| Super Admin | `superadmin@dentapp.com` | `superadmin123` |
+| Clinic Admin | `admin@clinica.com` | `admin123` |
 
 > Change these credentials immediately in any environment exposed to the internet.
 
@@ -217,7 +228,9 @@ CajaRecord           — billing record (PENDIENTE → ABONO_PARCIAL → PAGADO)
 ```
 
 **AppModule enum:** `APPOINTMENTS | PATIENTS | INVENTORY | CAJA | AI_ASSISTANT`
-**UserRole enum:** `ADMIN | DOCTOR`
+**UserRole enum:** `SUPER_ADMIN | ADMIN | DOCTOR`
+
+`SUPER_ADMIN` users have `organizationId = null` and access only `/superadmin/**` routes. `ADMIN` and `DOCTOR` have a non-null `organizationId` and access only `/(dashboard)/**` routes. The session layer enforces this split via `verifySuperAdmin()` and `verifySession()` respectively.
 
 ---
 
@@ -256,6 +269,7 @@ npm run test:unit:coverage   # Coverage report (V8)
 - `tests/unit/services/org-modules.service.test.ts` — org + doctor module permission logic
 - `tests/unit/services/appointments.service.test.ts` — doctor-scoped data isolation
 - `tests/unit/services/patients.service.test.ts` — doctor scoping + pagination
+- `tests/unit/services/superadmin.service.test.ts` — org creation, suspension, module cascade disable
 
 **Setup:** `tests/setup.ts` mocks `server-only` and `React.cache` (pass-through) so server-only imports and cached functions work in the test environment.
 
@@ -285,6 +299,7 @@ npx playwright test --ui
 - `e2e/flows/` — full user flows (patient creation, appointment scheduling, payment cycle)
 - `e2e/flows/module-gating.spec.ts` — sidebar shows/hides modules; direct URL to disabled module → 403
 - `e2e/flows/doctor-login.spec.ts` — doctor with modules → redirected; no modules → `/no-access`
+- `e2e/flows/superadmin.spec.ts` — super admin login, org creation, module toggles, org suspension, suspended-org login block
 - `e2e/a11y/` — WCAG 2.1 A/AA accessibility audit on all main routes
 - `e2e/ux/` — Spanish error messages, responsive layout on tablet
 
@@ -298,33 +313,52 @@ npx playwright test --ui
 dental-app/
 ├── app/
 │   ├── (auth)/login/          # Login page and server action
-│   ├── (dashboard)/           # All authenticated routes
+│   ├── (dashboard)/           # Clinic dashboard (ADMIN and DOCTOR roles)
 │   │   ├── admin/             # Doctors, procedures, RIPS, settings
-│   │   │   └── settings/      # Org module toggles (admin only)
+│   │   │   └── settings/      # Read-only module view (configured by super admin)
 │   │   ├── appointments/      # Calendar and scheduling
 │   │   ├── caja/              # Billing
 │   │   ├── inventory/         # Stock management
 │   │   ├── patients/          # Patient list and clinical history
 │   │   ├── ai-assistant/      # Claude chat interface
 │   │   └── no-access/         # Doctor with zero accessible modules
+│   ├── (superadmin)/          # Platform owner panel (SUPER_ADMIN role only)
+│   │   └── superadmin/organizations/
+│   │       ├── page.tsx       # Org list
+│   │       ├── new/           # Create org form
+│   │       └── [id]/          # Org detail: module toggles + suspend/activate
 │   ├── actions/auth.ts        # Login / logout server actions (role-aware redirect)
 │   └── api/                   # API route handlers
-│       └── admin/doctors/[id]/
-│           ├── login/         # POST (enable) / DELETE (disable doctor login)
-│           └── modules/       # GET + PUT doctor module permissions
+│       ├── admin/doctors/[id]/
+│       │   ├── login/         # POST (enable) / DELETE (disable doctor login)
+│       │   └── modules/       # GET + PUT doctor module permissions
+│       └── superadmin/organizations/
+│           ├── route.ts       # GET (list) + POST (create)
+│           ├── [id]/route.ts  # GET (detail) + PUT (update name/active)
+│           └── [id]/modules/  # PUT (set module enabled)
 ├── components/
 │   ├── admin/
-│   │   ├── org-module-settings.tsx    # Org-level module toggle UI
+│   │   ├── org-module-settings.tsx    # Read-only module view for clinic admin
 │   │   └── doctor-permissions-panel.tsx # Per-doctor module grant panel
-│   └── layout/sidebar.tsx     # Dynamic sidebar driven by enabledModules[]
+│   ├── superadmin/
+│   │   ├── org-list-client.tsx        # Organization table with module chips
+│   │   ├── org-form.tsx               # Create organization form
+│   │   └── org-detail-client.tsx      # Module toggles + suspend/activate
+│   └── layout/sidebar.tsx             # Dynamic sidebar driven by enabledModules[]
 ├── lib/
 │   ├── crypto.ts              # AES-256-GCM field encryption
 │   ├── session.ts             # JWT session management (role, orgId, doctorId)
+│   ├── dal.ts                 # verifySession (→ DashboardSessionUser), verifySuperAdmin (→ SuperAdminSessionUser)
 │   ├── modules.ts             # server-only: getAccessibleModules, assertModuleAccess
 │   ├── module-metadata.ts     # client-safe: MODULE_METADATA, MODULE_ORDER
 │   ├── repositories/          # Data access layer
+│   │   ├── superadmin.repository.ts   # listOrganizations, findById, slugExists, create, update, setModule
+│   │   └── ...
 │   ├── services/              # Business logic layer
+│   │   ├── superadmin.service.ts      # listOrganizations, getOrgDetail, createOrganization (tx), setOrgModule (cascade)
+│   │   └── ...
 │   ├── validations/           # Zod schemas (shared client + server)
+│   │   └── organization.schema.ts     # createOrganizationSchema, updateOrganizationSchema, setOrgModuleSchema
 │   └── integrations/
 │       ├── anthropic/         # Claude AI tools and system prompt (org-scoped)
 │       ├── rips/              # RIPS JSON mapper (Resolution 2275/2023)
@@ -335,7 +369,7 @@ dental-app/
 │   └── whatsapp-reminder.ts   # Durable reminder job function
 ├── prisma/
 │   ├── schema.prisma          # Database schema
-│   ├── seed.ts                # Organization + admin user + inventory categories
+│   ├── seed.ts                # Organization + admin user + super admin + inventory categories
 │   └── scripts/
 │       └── backfill-default-org.ts  # One-time migration: link existing data to org
 ├── tests/
@@ -343,12 +377,14 @@ dental-app/
 │   └── unit/
 │       ├── lib/modules.test.ts
 │       └── services/
+│           ├── superadmin.service.test.ts
 │           ├── org-modules.service.test.ts
 │           ├── appointments.service.test.ts
 │           └── patients.service.test.ts
 ├── e2e/                       # Playwright test suite
 │   ├── fixtures/              # Auth setup and DB helpers (getDefaultOrgId)
 │   ├── flows/                 # User journey tests
+│   │   ├── superadmin.spec.ts
 │   │   ├── module-gating.spec.ts
 │   │   └── doctor-login.spec.ts
 │   ├── a11y/                  # Accessibility audits
