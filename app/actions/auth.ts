@@ -45,24 +45,26 @@ export async function login(
     return { error: "Email o contraseña incorrectos" };
   }
 
-  if (!user.organizationId) {
-    return { error: "Usuario sin organización asignada. Contacta al administrador." };
-  }
-
-  const role = user.role === "DOCTOR" ? "DOCTOR" : "ADMIN";
+  const role = user.role === "DOCTOR" ? "DOCTOR" : user.role === "SUPER_ADMIN" ? "SUPER_ADMIN" : "ADMIN";
   const doctorId = user.doctor?.id ?? null;
 
-  await createSession(
-    user.id,
-    user.email,
-    user.name,
-    role,
-    user.organizationId,
-    doctorId
-  );
+  // Non-super-admin users must belong to an active organization
+  if (role !== "SUPER_ADMIN") {
+    if (!user.organizationId) {
+      return { error: "Usuario sin organización asignada. Contacta al administrador." };
+    }
+    const org = await db.organization.findUnique({ where: { id: user.organizationId } });
+    if (!org?.active) {
+      return { error: "La cuenta de tu clínica está suspendida. Contacta al proveedor." };
+    }
+  }
 
-  if (role === "DOCTOR") {
-    const accessible = await getAccessibleModules(user.organizationId, "DOCTOR", doctorId);
+  await createSession(user.id, user.email, user.name, role, user.organizationId ?? null, doctorId);
+
+  if (role === "SUPER_ADMIN") {
+    redirect("/superadmin/organizations");
+  } else if (role === "DOCTOR") {
+    const accessible = await getAccessibleModules(user.organizationId!, "DOCTOR", doctorId);
     const firstMod = MODULE_ORDER.find((m) => accessible.has(m));
     redirect(firstMod ? MODULE_METADATA[firstMod].href : "/no-access");
   } else {

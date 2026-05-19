@@ -6,8 +6,8 @@ export type SessionPayload = {
   userId: string;
   email: string;
   name: string;
-  role: "ADMIN" | "DOCTOR";
-  organizationId: string;
+  role: "ADMIN" | "DOCTOR" | "SUPER_ADMIN";
+  organizationId: string | null;
   doctorId: string | null;
   expiresAt: Date;
 };
@@ -42,8 +42,8 @@ export async function createSession(
   userId: string,
   email: string,
   name: string,
-  role: "ADMIN" | "DOCTOR",
-  organizationId: string,
+  role: "ADMIN" | "DOCTOR" | "SUPER_ADMIN",
+  organizationId: string | null,
   doctorId: string | null
 ) {
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
