@@ -1,8 +1,5 @@
-"use client";
-
-import { useState, useTransition } from "react";
-import { AppModule, MODULE_METADATA, MODULE_ORDER } from "@/lib/module-metadata";
-import { toast } from "sonner";
+import { AppModule } from "@prisma/client";
+import { MODULE_METADATA, MODULE_ORDER } from "@/lib/module-metadata";
 
 type OrgModuleRow = {
   module: AppModule;
@@ -14,30 +11,7 @@ type Props = {
 };
 
 export function OrgModuleSettings({ modules }: Props) {
-  const [state, setState] = useState<Record<AppModule, boolean>>(
-    () => Object.fromEntries(modules.map((m) => [m.module, m.enabled])) as Record<AppModule, boolean>
-  );
-  const [pending, startTransition] = useTransition();
-
-  function toggle(module: AppModule, value: boolean) {
-    const previous = state[module];
-    setState((prev) => ({ ...prev, [module]: value }));
-
-    startTransition(async () => {
-      const res = await fetch("/api/admin/org-modules", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ module, enabled: value }),
-      });
-
-      if (!res.ok) {
-        setState((prev) => ({ ...prev, [module]: previous }));
-        toast.error("Error al actualizar el módulo");
-      } else {
-        toast.success(`Módulo ${value ? "activado" : "desactivado"}`);
-      }
-    });
-  }
+  const state = Object.fromEntries(modules.map((m) => [m.module, m.enabled])) as Record<AppModule, boolean>;
 
   return (
     <div className="space-y-2">
@@ -52,24 +26,18 @@ export function OrgModuleSettings({ modules }: Props) {
             className="flex items-center justify-between p-4 bg-white rounded-lg border border-gray-200"
           >
             <div className="flex items-center gap-3">
-              <Icon size={18} className="text-gray-500" />
-              <span className="text-sm font-medium text-gray-900">{meta.label}</span>
+              <Icon size={18} className={enabled ? "text-purple-600" : "text-gray-400"} />
+              <span className={`text-sm font-medium ${enabled ? "text-gray-900" : "text-gray-400"}`}>
+                {meta.label}
+              </span>
             </div>
-            <button
-              role="switch"
-              aria-checked={enabled}
-              disabled={pending}
-              onClick={() => toggle(mod, !enabled)}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 disabled:opacity-50 ${
-                enabled ? "bg-blue-600" : "bg-gray-200"
+            <span
+              className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                enabled ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
               }`}
             >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
-                  enabled ? "translate-x-6" : "translate-x-1"
-                }`}
-              />
-            </button>
+              {enabled ? "Activo" : "Inactivo"}
+            </span>
           </div>
         );
       })}

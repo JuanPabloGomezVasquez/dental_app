@@ -11,9 +11,9 @@ export default async function SettingsPage() {
   return (
     <div className="p-6 space-y-4 max-w-xl">
       <div>
-        <h1 className="text-xl font-semibold text-gray-900">Configuración de módulos</h1>
+        <h1 className="text-xl font-semibold text-gray-900">Módulos contratados</h1>
         <p className="text-sm text-gray-500 mt-0.5">
-          Activa o desactiva los módulos disponibles para tu clínica.
+          Estos son los módulos habilitados para tu clínica. Para cambios, contacta al administrador de la plataforma.
         </p>
       </div>
       <OrgModuleSettings modules={modules} />
