@@ -51,6 +51,20 @@ async function main() {
     });
   }
 
+  // Super admin (platform owner) — no organizationId
+  const superAdminPassword = await bcrypt.hash("superadmin123", 12);
+  await db.user.upsert({
+    where: { email: "superadmin@dentapp.com" },
+    update: {},
+    create: {
+      email: "superadmin@dentapp.com",
+      hashedPassword: superAdminPassword,
+      name: "Super Admin",
+      role: "SUPER_ADMIN",
+      organizationId: null,
+    },
+  });
+
   console.log("✓ Seed completado");
 }
 

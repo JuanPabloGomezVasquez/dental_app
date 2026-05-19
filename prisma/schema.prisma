@@ -10,6 +10,7 @@ datasource db {
 enum UserRole {
   ADMIN
   DOCTOR
+  SUPER_ADMIN
 }
 
 enum AppModule {
@@ -60,17 +61,17 @@ model DoctorModulePermission {
 }
 
 model User {
-  id             String       @id @default(cuid())
-  email          String       @unique
+  id             String        @id @default(cuid())
+  email          String        @unique
   hashedPassword String
   name           String
-  role           UserRole     @default(ADMIN)
-  active         Boolean      @default(true)
-  organizationId String
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  organization   Organization @relation(fields: [organizationId], references: [id])
-  doctor         Doctor?      @relation("UserDoctor")
+  role           UserRole      @default(ADMIN)
+  active         Boolean       @default(true)
+  organizationId String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  doctor         Doctor?       @relation("UserDoctor")
 }
 
 model Doctor {
