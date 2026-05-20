@@ -1,11 +1,15 @@
 "use client";
 import { useActionState } from "react";
+import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { login, type LoginState } from "@/app/actions/auth";
 
 const initialState: LoginState = {};
 
 export default function LoginPage() {
   const [state, action, pending] = useActionState(login, initialState);
+  const searchParams = useSearchParams();
+  const justReset = searchParams.get("reset") === "1";
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -57,6 +61,12 @@ export default function LoginPage() {
               />
             </div>
 
+            {justReset && (
+              <div className="rounded-lg bg-green-50 border border-green-200 px-3 py-2">
+                <p className="text-sm text-green-700">Contraseña actualizada. Ya puedes iniciar sesión.</p>
+              </div>
+            )}
+
             {state?.error && (
               <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2">
                 <p className="text-sm text-red-700">{state.error}</p>
@@ -70,6 +80,12 @@ export default function LoginPage() {
             >
               {pending ? "Iniciando sesión..." : "Iniciar sesión"}
             </button>
+
+            <p className="text-center text-sm text-gray-500">
+              <Link href="/forgot-password" className="text-blue-600 hover:underline">
+                ¿Olvidaste tu contraseña?
+              </Link>
+            </p>
           </form>
         </div>
       </div>
