@@ -22,14 +22,6 @@ function toDateInputValue(date: Date): string {
   return date.toISOString().split("T")[0] ?? ""
 }
 
-function formatSlot(isoString: string): string {
-  return new Intl.DateTimeFormat("es-CO", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true,
-    timeZone: "America/Bogota",
-  }).format(new Date(isoString))
-}
 
 export function AppointmentForm({
   open,
@@ -39,14 +31,12 @@ export function AppointmentForm({
 }: AppointmentFormProps) {
   const [doctors, setDoctors] = useState<DoctorOption[]>([])
   const [procedures, setProcedures] = useState<ProcedureOption[]>([])
-  const [availableSlots, setAvailableSlots] = useState<string[]>([])
-  const [isLoadingSlots, setIsLoadingSlots] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isPatientFormOpen, setIsPatientFormOpen] = useState(false)
 
   const [selectedDoctorId, setSelectedDoctorId] = useState("")
   const [selectedDate, setSelectedDate] = useState("")
-  const [selectedSlot, setSelectedSlot] = useState("")
+  const [selectedTime, setSelectedTime] = useState("")
   const [selectedProcedureId, setSelectedProcedureId] = useState("")
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
@@ -57,10 +47,9 @@ export function AppointmentForm({
 
     setSelectedDoctorId("")
     setSelectedDate(initialDate ? toDateInputValue(initialDate) : "")
-    setSelectedSlot("")
+    setSelectedTime(initialDate ? `${String(initialDate.getHours()).padStart(2, "0")}:${String(initialDate.getMinutes()).padStart(2, "0")}` : "")
     setSelectedProcedureId("")
     setSelectedPatientId(null)
-    setAvailableSlots([])
     setFormError(null)
 
     void Promise.all([
@@ -72,33 +61,20 @@ export function AppointmentForm({
     })
   }, [open, initialDate])
 
-  // Reload slots when doctor or date changes
-  useEffect(() => {
-    if (!selectedDoctorId || !selectedDate) {
-      setAvailableSlots([])
-      setSelectedSlot("")
-      return
-    }
-
-    setIsLoadingSlots(true)
-    setSelectedSlot("")
-
-    const params = new URLSearchParams({ doctorId: selectedDoctorId, date: selectedDate })
-    fetch(`/api/appointments/available-slots?${params.toString()}`)
-      .then((res) => res.json())
-      .then((data) => setAvailableSlots(data as string[]))
-      .catch(() => setAvailableSlots([]))
-      .finally(() => setIsLoadingSlots(false))
-  }, [selectedDoctorId, selectedDate])
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setFormError(null)
 
-    if (!selectedPatientId || !selectedDoctorId || !selectedProcedureId || !selectedSlot) {
+    if (!selectedPatientId || !selectedDoctorId || !selectedProcedureId || !selectedDate || !selectedTime) {
       setFormError("Todos los campos son requeridos")
       return
     }
+
+    // Convert Colombia local time (UTC-5) to UTC ISO string
+    const [hours, minutes] = selectedTime.split(":").map(Number)
+    const dateUtc = new Date(selectedDate)
+    dateUtc.setUTCHours((hours ?? 0) + 5, minutes ?? 0, 0, 0)
 
     setIsSubmitting(true)
     try {
@@ -109,7 +85,7 @@ export function AppointmentForm({
           patientId:   selectedPatientId,
           doctorId:    selectedDoctorId,
           procedureId: selectedProcedureId,
-          date:        selectedSlot,
+          date:        dateUtc.toISOString(),
         }),
       })
 
@@ -192,28 +168,18 @@ export function AppointmentForm({
             </div>
 
             <div>
-              <label htmlFor="apt-slot" className="block text-sm font-medium text-gray-700 mb-1">
-                Horario <span aria-hidden="true">*</span>
+              <label htmlFor="apt-time" className="block text-sm font-medium text-gray-700 mb-1">
+                Hora <span aria-hidden="true">*</span>
               </label>
-              <select
-                id="apt-slot"
-                value={selectedSlot}
-                onChange={(e) => setSelectedSlot(e.target.value)}
-                disabled={!selectedDoctorId || !selectedDate || isLoadingSlots}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-              >
-                <option value="">
-                  {isLoadingSlots ? "Cargando horarios..." : "Seleccionar horario..."}
-                </option>
-                {availableSlots.map((slot) => (
-                  <option key={slot} value={slot}>
-                    {formatSlot(slot)}
-                  </option>
-                ))}
-              </select>
-              {!isLoadingSlots && selectedDoctorId && selectedDate && availableSlots.length === 0 && (
-                <p className="mt-1 text-xs text-amber-600">No hay horarios disponibles para este día</p>
-              )}
+              <input
+                id="apt-time"
+                type="time"
+                value={selectedTime}
+                min="08:00"
+                max="18:00"
+                onChange={(e) => setSelectedTime(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
             </div>
 
             <div>

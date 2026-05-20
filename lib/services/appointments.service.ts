@@ -9,6 +9,8 @@ import { NotFoundError, ConflictError } from "@/lib/errors"
 const SLOT_DURATION_MS = 30 * 60 * 1000
 const DAY_START_HOUR = 8
 const DAY_END_HOUR = 18
+// Colombia is UTC-5 — shift working hours to UTC so slot times display correctly
+const COLOMBIA_OFFSET_HOURS = 5
 
 interface AppointmentsService {
   listByDateRange(
@@ -119,9 +121,9 @@ const service: AppointmentsService = {
     const date = new Date(dateStr)
 
     const dayStart = new Date(date)
-    dayStart.setUTCHours(DAY_START_HOUR, 0, 0, 0)
+    dayStart.setUTCHours(DAY_START_HOUR + COLOMBIA_OFFSET_HOURS, 0, 0, 0)
     const dayEnd = new Date(date)
-    dayEnd.setUTCHours(DAY_END_HOUR, 0, 0, 0)
+    dayEnd.setUTCHours(DAY_END_HOUR + COLOMBIA_OFFSET_HOURS, 0, 0, 0)
 
     const existing = await appointmentsRepository.findByDoctorAndDate(
       doctorId,

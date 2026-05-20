@@ -37,23 +37,37 @@ export function AppointmentCalendar({
 }: AppointmentCalendarProps) {
   const [currentView, setCurrentView] = useState<View>("week")
 
+  const now = new Date()
+
   const events: RbcEvent[] = appointments.map((apt) => {
     const start = new Date(apt.date)
     const end = new Date(start.getTime() + 30 * 60 * 1000)
     return {
       id: apt.id,
-      title: `${apt.patient.lastName} — ${apt.procedure.name}`,
+      title: `${apt.patient.lastName} — ${apt.procedure.name} · ${apt.doctor.name}`,
       start,
       end,
       resource: apt,
     }
   })
 
+  function eventPropGetter(event: RbcEvent) {
+    const isPast = event.end < now
+    return {
+      style: isPast ? { opacity: 0.45 } : undefined,
+    }
+  }
+
   function handleRangeChange(range: Date[] | { start: Date; end: Date }) {
     if (Array.isArray(range)) {
       const first = range[0]
       const last = range[range.length - 1]
-      if (first && last) onRangeChange({ start: first, end: last })
+      if (!first || !last) return
+      const start = new Date(first)
+      start.setHours(0, 0, 0, 0)
+      const end = new Date(last)
+      end.setHours(23, 59, 59, 999)
+      onRangeChange({ start, end })
     } else {
       onRangeChange(range)
     }
@@ -71,6 +85,7 @@ export function AppointmentCalendar({
         onSelectSlot={(slot) => onSlotSelect(slot.start)}
         onSelectEvent={(event) => onEventSelect(event.resource)}
         onRangeChange={handleRangeChange}
+        eventPropGetter={eventPropGetter}
         culture="es"
         messages={{
           next: "Siguiente",
