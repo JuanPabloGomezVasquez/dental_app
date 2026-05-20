@@ -61,10 +61,10 @@ test("clinic admin cannot access /superadmin routes and is redirected to login",
   await page.getByRole("button", { name: "Iniciar sesión" }).click();
   await page.waitForURL("**/dashboard", { timeout: 10000 });
 
-  // Attempt to navigate to superadmin panel
+  // Attempt to navigate to superadmin panel — authenticated users without SUPER_ADMIN are redirected to /dashboard
   await page.goto("/superadmin/organizations");
-  await page.waitForURL("**/login", { timeout: 6000 });
-  await expect(page).toHaveURL(/\/login/);
+  await page.waitForURL("**/dashboard", { timeout: 6000 });
+  await expect(page).toHaveURL(/\/dashboard/);
 });
 
 // ─── Organization creation ────────────────────────────────────────────────────
@@ -78,7 +78,7 @@ test("super admin can create a new organization", async ({ page }) => {
   await page.getByRole("link", { name: /nueva organización/i }).click();
   await page.waitForURL("**/superadmin/organizations/new", { timeout: 6000 });
 
-  await page.getByLabel("Nombre").fill("Clínica E2E Test");
+  await page.getByLabel("Nombre", { exact: true }).fill("Clínica E2E Test");
   await page.getByLabel(/slug/i).fill(slug);
   await page.getByLabel("Nombre completo").fill("Admin E2E");
   await page.getByLabel("Email").fill(adminEmail);
@@ -89,8 +89,8 @@ test("super admin can create a new organization", async ({ page }) => {
   // Redirected back to org list
   await page.waitForURL("**/superadmin/organizations", { timeout: 10000 });
 
-  // Org should appear in the list
-  await expect(page.getByText("Clínica E2E Test")).toBeVisible();
+  // Org should appear in the list (use first() to handle leftover orgs from prior runs)
+  await expect(page.getByText("Clínica E2E Test").first()).toBeVisible();
 
   // Store ID for cleanup
   const org = await db.organization.findUnique({ where: { slug } });
@@ -107,8 +107,8 @@ test("super admin can navigate to org detail and see module list", async ({ page
   await page.waitForURL("**/superadmin/organizations/**", { timeout: 6000 });
 
   await expect(page.getByText(/módulos contratados/i)).toBeVisible();
-  // Each AppModule should be listed
-  await expect(page.getByRole("switch", { name: /citas/i })).toBeVisible();
+  // Each AppModule should be listed (label is "Agendamiento", not "Citas")
+  await expect(page.getByRole("switch", { name: /agendamiento/i })).toBeVisible();
 });
 
 test("super admin can toggle a module off and on", async ({ page }) => {
@@ -132,9 +132,18 @@ test("super admin can toggle a module off and on", async ({ page }) => {
   await expect(cajaSwitch).toBeVisible();
   await expect(cajaSwitch).toHaveAttribute("aria-checked", "true");
 
-  // Toggle off
+  // Toggle off — wait for the API PUT response (handles cold Next.js dev-mode compilation)
+  const offResponsePromise = page.waitForResponse(
+    (resp) =>
+      resp.url().includes(`/api/superadmin/organizations/${testOrgId}/modules`) &&
+      resp.request().method() === "PUT",
+    { timeout: 15000 }
+  );
   await cajaSwitch.click();
   await expect(cajaSwitch).toHaveAttribute("aria-checked", "false");
+  const offResponse = await offResponsePromise;
+  expect(offResponse.ok()).toBe(true);
+  await expect(page.getByText(/módulo desactivado/i)).toBeVisible({ timeout: 5000 });
 
   // Verify persisted in DB
   const row = await db.orgModule.findUnique({
@@ -142,9 +151,18 @@ test("super admin can toggle a module off and on", async ({ page }) => {
   });
   expect(row?.enabled).toBe(false);
 
-  // Toggle back on
+  // Toggle back on — same pattern
+  const onResponsePromise = page.waitForResponse(
+    (resp) =>
+      resp.url().includes(`/api/superadmin/organizations/${testOrgId}/modules`) &&
+      resp.request().method() === "PUT",
+    { timeout: 15000 }
+  );
   await cajaSwitch.click();
   await expect(cajaSwitch).toHaveAttribute("aria-checked", "true");
+  const onResponse = await onResponsePromise;
+  expect(onResponse.ok()).toBe(true);
+  await expect(page.getByText(/módulo activado/i)).toBeVisible({ timeout: 5000 });
 });
 
 // ─── Org suspension ───────────────────────────────────────────────────────────
@@ -165,8 +183,9 @@ test("super admin can suspend and reactivate an organization", async ({ page }) 
   await expect(suspendBtn).toBeVisible();
   await suspendBtn.click();
 
-  // Status badge should change
-  await expect(page.getByText("Suspendida")).toBeVisible({ timeout: 5000 });
+  // Wait for toast confirmation (API call completes), then check badge
+  await expect(page.getByText(/organización suspendida/i)).toBeVisible({ timeout: 8000 });
+  await expect(page.getByText("Suspendida", { exact: true })).toBeVisible({ timeout: 5000 });
 
   // Verify in DB
   const org = await db.organization.findUnique({ where: { id: testOrgId } });
@@ -174,7 +193,8 @@ test("super admin can suspend and reactivate an organization", async ({ page }) 
 
   // Reactivate
   await page.getByRole("button", { name: /activar/i }).click();
-  await expect(page.getByText("Activa")).toBeVisible({ timeout: 5000 });
+  await expect(page.getByText(/organización activada/i)).toBeVisible({ timeout: 8000 });
+  await expect(page.getByText("Activa", { exact: true })).toBeVisible({ timeout: 5000 });
 });
 
 // ─── Suspended org blocks login ───────────────────────────────────────────────

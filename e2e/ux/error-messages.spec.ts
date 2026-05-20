@@ -15,9 +15,10 @@ test.describe("Mensajes de error en español", () => {
   });
 
   test("error de cédula duplicada muestra mensaje claro", async ({ page }) => {
-    const idNumber = `DUP-${Date.now()}`;
+    // idNumber must be numeric (4-20 digits) to pass client-side validation
+    const idNumber = `${Date.now()}`.slice(-10);
     const organizationId = await getDefaultOrgId();
-    await db.patient.create({
+    const created = await db.patient.create({
       data: {
         firstName: "Existente",
         lastName: "Test",
@@ -41,7 +42,7 @@ test.describe("Mensajes de error en español", () => {
 
     await expect(page.getByText(/cédula|ya existe/i).first()).toBeVisible({ timeout: 8000 });
 
-    await db.patient.deleteMany({ where: { idNumber } });
+    await db.patient.deleteMany({ where: { id: created.id } });
   });
 
   test("estados vacíos muestran texto en español", async ({ page }) => {

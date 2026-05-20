@@ -30,7 +30,7 @@ test("sidebar shows Caja link when module is enabled", async ({ page }) => {
   });
 
   await page.goto("/dashboard");
-  await expect(page.getByRole("link", { name: "Caja" })).toBeVisible({ timeout: 5000 });
+  await expect(page.getByRole("link", { name: "Caja", exact: true }).first()).toBeVisible({ timeout: 5000 });
 });
 
 test("sidebar hides Caja link when module is disabled for the org", async ({ page }) => {

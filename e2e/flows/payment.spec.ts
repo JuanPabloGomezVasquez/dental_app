@@ -50,7 +50,7 @@ test.describe("Flujo: registro de pago completo", () => {
 
     await page.getByRole("button", { name: "Crear registro" }).click();
 
-    await expect(page.getByText(/Abono Parcial/i)).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/Abono Parcial/i).first()).toBeVisible({ timeout: 10000 });
     await expect(page.getByText(/150\.000|150,000/i)).toBeVisible();
 
     // Target the specific row by description to avoid clicking on other records
@@ -62,8 +62,8 @@ test.describe("Flujo: registro de pago completo", () => {
     await page.locator('select[name="method"]').selectOption("TRANSFERENCIA");
     await page.getByRole("button", { name: "Registrar abono" }).click();
 
-    // Exact match avoids strict mode collision with the "Pagados" tab button
-    await expect(page.getByText("Pagado", { exact: true })).toBeVisible({ timeout: 10000 });
+    // Target the badge span specifically to avoid matching other "Pagado" text on page
+    await expect(page.locator("span").filter({ hasText: /^Pagado$/ }).first()).toBeVisible({ timeout: 10000 });
 
     // Verify invoice column: shows MOCK-... number in dev mode
     await page.goto("/caja");

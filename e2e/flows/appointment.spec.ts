@@ -62,11 +62,8 @@ test.describe("Flujo: crear paciente y agendar cita", () => {
     tomorrow.setDate(tomorrow.getDate() + 1);
     await page.locator("#apt-date").fill(tomorrow.toISOString().slice(0, 10));
 
-    // Wait for slot select to load then pick first available
-    const slotSelect = page.locator("#apt-slot");
-    await expect(slotSelect).not.toBeDisabled({ timeout: 8000 });
-    await expect(slotSelect.locator("option").nth(1)).toBeAttached({ timeout: 5000 });
-    await slotSelect.selectOption({ index: 1 });
+    // Time is now a free-text input (min 08:00, max 18:00)
+    await page.locator("#apt-time").fill("09:00");
 
     await page.locator("#apt-procedure").selectOption({ label: "Revisión E2E" });
 
