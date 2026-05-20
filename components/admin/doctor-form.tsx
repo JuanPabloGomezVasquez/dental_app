@@ -165,8 +165,19 @@ export function DoctorForm({ open, doctor, onSuccess, onClose }: DoctorFormProps
           </div>
 
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Correo electrónico</label>
-            <input id="email" type="email" {...register("email")} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+              Correo electrónico {!isEditing && <span aria-hidden="true">*</span>}
+            </label>
+            <input
+              id="email"
+              type="email"
+              {...register("email")}
+              disabled={isEditing}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
+            />
+            {!isEditing && (
+              <p className="mt-1 text-xs text-gray-400">Se enviará la contraseña temporal a este correo.</p>
+            )}
             {errors.email && (
               <p role="alert" className="mt-1 text-xs text-red-600">{errors.email.message}</p>
             )}

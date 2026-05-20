@@ -5,6 +5,12 @@ import { doctorsRepository } from "@/lib/repositories/doctors.repository";
 import { orgModulesRepository } from "@/lib/repositories/org-modules.repository";
 import type { CreateDoctorInput, UpdateDoctorInput } from "@/lib/validations/doctor.schema";
 import { NotFoundError, ConflictError } from "@/lib/errors";
+import { sendWelcomeDoctorEmail } from "@/lib/email";
+
+function generateTempPassword(): string {
+  const chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+  return Array.from({ length: 12 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+}
 
 interface DoctorsService {
   list(options: { organizationId: string; active?: boolean }): Promise<Doctor[]>;
@@ -38,8 +44,47 @@ const service: DoctorsService = {
     return doctor;
   },
 
-  create(data, organizationId) {
-    return doctorsRepository.create({ ...data, organizationId });
+  async create(data, organizationId) {
+    const emailConflict = await db.user.findUnique({ where: { email: data.email } });
+    if (emailConflict) {
+      throw new ConflictError("Ya existe un usuario con ese correo electrónico");
+    }
+
+    const tempPassword = generateTempPassword();
+    const hashedPassword = await bcrypt.hash(tempPassword, 12);
+
+    let doctor!: Doctor;
+
+    await db.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          email: data.email,
+          hashedPassword,
+          name: data.name,
+          role: "DOCTOR",
+          organizationId,
+        },
+      });
+
+      doctor = await tx.doctor.create({
+        data: {
+          name: data.name,
+          specialty: data.specialty,
+          phone: data.phone,
+          email: data.email,
+          organizationId,
+          userId: user.id,
+        },
+      });
+    });
+
+    try {
+      await sendWelcomeDoctorEmail(data.email, data.name, tempPassword);
+    } catch (err) {
+      console.error("[doctors.service] Failed to send welcome email to %s:", data.email, err);
+    }
+
+    return doctor;
   },
 
   async update(id, organizationId, data) {
