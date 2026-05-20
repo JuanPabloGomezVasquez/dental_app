@@ -1,5 +1,6 @@
 import "server-only";
 import { cache } from "react";
+import { forbidden } from "next/navigation";
 import { db } from "@/lib/db";
 import { ForbiddenError } from "@/lib/errors";
 
@@ -50,5 +51,15 @@ export function assertModuleAccess(
 ): void {
   if (!accessible.has(module)) {
     throw new ForbiddenError("No tienes acceso a este módulo");
+  }
+}
+
+/** Use in server component pages (NOT API routes). Returns HTTP 403. */
+export function requireModuleAccess(
+  accessible: Set<AppModule>,
+  module: AppModule
+): void {
+  if (!accessible.has(module)) {
+    forbidden();
   }
 }

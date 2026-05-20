@@ -1,5 +1,5 @@
-import { verifySession } from "@/lib/dal"
-import { getAccessibleModules, assertModuleAccess, AppModule } from "@/lib/modules"
+﻿import { verifySession } from "@/lib/dal"
+import { getAccessibleModules, requireModuleAccess, AppModule } from "@/lib/modules"
 import { appointmentsService } from "@/lib/services/appointments.service"
 import { AppointmentsPageClient } from "@/components/appointments/appointments-page-client"
 
@@ -22,7 +22,7 @@ function getWeekRange(): { start: Date; end: Date } {
 export default async function AppointmentsPage() {
   const session = await verifySession()
   const accessible = await getAccessibleModules(session.organizationId, session.role, session.doctorId)
-  assertModuleAccess(accessible, AppModule.APPOINTMENTS)
+  requireModuleAccess(accessible, AppModule.APPOINTMENTS)
 
   const { start, end } = getWeekRange()
   const appointments = await appointmentsService.listByDateRange(
@@ -42,3 +42,4 @@ export default async function AppointmentsPage() {
     </div>
   )
 }
+

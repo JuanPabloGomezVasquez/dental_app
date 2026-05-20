@@ -1,12 +1,12 @@
-import { verifySession } from "@/lib/dal";
-import { getAccessibleModules, assertModuleAccess, AppModule } from "@/lib/modules";
+﻿import { verifySession } from "@/lib/dal";
+import { getAccessibleModules, requireModuleAccess, AppModule } from "@/lib/modules";
 import { inventoryService } from "@/lib/services/inventory.service";
 import { InventoryPageClient } from "@/components/inventory/inventory-page-client";
 
 export default async function InventoryPage() {
   const session = await verifySession();
   const accessible = await getAccessibleModules(session.organizationId, session.role, session.doctorId);
-  assertModuleAccess(accessible, AppModule.INVENTORY);
+  requireModuleAccess(accessible, AppModule.INVENTORY);
 
   const [items, categories] = await Promise.all([
     inventoryService.list({ organizationId: session.organizationId }),
@@ -14,3 +14,4 @@ export default async function InventoryPage() {
   ]);
   return <InventoryPageClient initialItems={items} categories={categories} />;
 }
+

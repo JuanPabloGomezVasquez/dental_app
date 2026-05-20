@@ -1,11 +1,11 @@
-import { verifySession } from "@/lib/dal";
-import { getAccessibleModules, assertModuleAccess, AppModule } from "@/lib/modules";
+﻿import { verifySession } from "@/lib/dal";
+import { getAccessibleModules, requireModuleAccess, AppModule } from "@/lib/modules";
 import { AiAssistantPageClient } from "@/components/ai-assistant/ai-assistant-page-client";
 
 export default async function AiAssistantPage() {
   const session = await verifySession();
   const accessible = await getAccessibleModules(session.organizationId, session.role, session.doctorId);
-  assertModuleAccess(accessible, AppModule.AI_ASSISTANT);
+  requireModuleAccess(accessible, AppModule.AI_ASSISTANT);
 
   return (
     <div className="flex flex-col h-full p-6 max-w-4xl">
@@ -14,3 +14,4 @@ export default async function AiAssistantPage() {
     </div>
   );
 }
+

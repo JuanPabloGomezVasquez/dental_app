@@ -1,5 +1,5 @@
-import { verifySession } from "@/lib/dal";
-import { getAccessibleModules, assertModuleAccess, AppModule } from "@/lib/modules";
+﻿import { verifySession } from "@/lib/dal";
+import { getAccessibleModules, requireModuleAccess, AppModule } from "@/lib/modules";
 import { patientsService } from "@/lib/services/patients.service";
 import { PatientsPageClient } from "@/components/patients/patients-page-client";
 
@@ -10,7 +10,7 @@ interface PatientsPageProps {
 export default async function PatientsPage({ searchParams }: PatientsPageProps) {
   const session = await verifySession();
   const accessible = await getAccessibleModules(session.organizationId, session.role, session.doctorId);
-  assertModuleAccess(accessible, AppModule.PATIENTS);
+  requireModuleAccess(accessible, AppModule.PATIENTS);
 
   const params = await searchParams;
   const search = params.search ?? "";
@@ -24,3 +24,4 @@ export default async function PatientsPage({ searchParams }: PatientsPageProps) 
   });
   return <PatientsPageClient data={data} search={search} />;
 }
+

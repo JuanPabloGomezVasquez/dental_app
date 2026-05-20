@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { verifySession } from "@/lib/dal";
-import { getAccessibleModules, assertModuleAccess, AppModule } from "@/lib/modules";
+import { getAccessibleModules, requireModuleAccess, AppModule } from "@/lib/modules";
 import { patientsService } from "@/lib/services/patients.service";
 import { clinicalHistoryService } from "@/lib/services/clinical-history.service";
 import { HabeaDataWarning } from "@/components/patients/habeas-data-warning";
@@ -16,7 +16,7 @@ interface PatientDetailPageProps {
 export default async function PatientDetailPage({ params }: PatientDetailPageProps) {
   const session = await verifySession();
   const accessible = await getAccessibleModules(session.organizationId, session.role, session.doctorId);
-  assertModuleAccess(accessible, AppModule.PATIENTS);
+  requireModuleAccess(accessible, AppModule.PATIENTS);
 
   const { id } = await params;
 
@@ -50,7 +50,12 @@ export default async function PatientDetailPage({ params }: PatientDetailPagePro
 
       <HabeaDataWarning hasConsent={patient.habeaDataConsent} />
 
-      <PatientDetailClient patient={patient} history={history} />
+      <PatientDetailClient
+        patient={patient}
+        history={history}
+        currentDoctorId={session.doctorId}
+        currentRole={session.role}
+      />
 
       <PatientPrivacyActions
         patientId={patient.id}
