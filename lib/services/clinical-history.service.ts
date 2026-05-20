@@ -1,12 +1,12 @@
-import type { ClinicalNote, OdontogramEntry, PatientFile } from "@prisma/client";
+import type { OdontogramEntry, PatientFile } from "@prisma/client";
 import { clinicalHistoryRepository } from "@/lib/repositories/clinical-history.repository";
-import type { ClinicalHistoryFull } from "@/lib/repositories/clinical-history.repository";
+import type { ClinicalHistoryFull, NoteWithDoctor } from "@/lib/repositories/clinical-history.repository";
 import type {
   CreateNoteInput,
   CreateOdontogramEntryInput,
   UpdateBackgroundInput,
 } from "@/lib/validations/clinical-history.schema";
-import { NotFoundError, ValidationError } from "@/lib/errors";
+import { NotFoundError, ValidationError, ForbiddenError } from "@/lib/errors";
 
 const VALID_TOOTH_NUMBERS = new Set([
   ...Array.from({ length: 8 }, (_, i) => 11 + i),
@@ -18,8 +18,9 @@ const VALID_TOOTH_NUMBERS = new Set([
 interface ClinicalHistoryService {
   getByPatientId(patientId: string): Promise<ClinicalHistoryFull>;
   updateBackground(patientId: string, data: UpdateBackgroundInput): Promise<void>;
-  addNote(patientId: string, data: CreateNoteInput): Promise<ClinicalNote>;
-  deleteNote(patientId: string, noteId: string): Promise<void>;
+  addNote(patientId: string, data: CreateNoteInput & { doctorId: string }): Promise<NoteWithDoctor>;
+  updateNote(patientId: string, noteId: string, content: string, callerDoctorId: string | null): Promise<NoteWithDoctor>;
+  deleteNote(patientId: string, noteId: string, callerRole: string, callerDoctorId: string | null): Promise<void>;
   upsertOdontogramEntry(
     patientId: string,
     data: CreateOdontogramEntryInput
@@ -59,8 +60,24 @@ const service: ClinicalHistoryService = {
     return clinicalHistoryRepository.addNote(history.id, data);
   },
 
-  async deleteNote(patientId, noteId) {
+  async updateNote(patientId, noteId, content, callerDoctorId) {
     await getHistory(patientId);
+    const note = await clinicalHistoryRepository.findNoteById(noteId);
+    if (!note) throw new NotFoundError("Nota no encontrada");
+    if (note.doctorId !== callerDoctorId) {
+      throw new ForbiddenError("Solo puedes editar tus propias notas");
+    }
+    return clinicalHistoryRepository.updateNote(noteId, content);
+  },
+
+  async deleteNote(patientId, noteId, callerRole, callerDoctorId) {
+    await getHistory(patientId);
+    const note = await clinicalHistoryRepository.findNoteById(noteId);
+    if (!note) throw new NotFoundError("Nota no encontrada");
+    const isAdmin = callerRole === "ADMIN" || callerRole === "SUPER_ADMIN";
+    if (!isAdmin && note.doctorId !== callerDoctorId) {
+      throw new ForbiddenError("Solo puedes eliminar tus propias notas");
+    }
     await clinicalHistoryRepository.deleteNote(noteId);
   },
 

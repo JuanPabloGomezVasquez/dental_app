@@ -16,12 +16,14 @@ type Tab = (typeof TABS)[number];
 interface ClinicalHistoryTabsProps {
   history: ClinicalHistoryFull;
   patientId: string;
+  currentDoctorId: string | null;
+  currentRole: string;
   onUpdate: () => void;
 }
 
 type SelectedSurface = { toothNumber: number; surface: Surface } | null;
 
-export function ClinicalHistoryTabs({ history, patientId, onUpdate }: ClinicalHistoryTabsProps) {
+export function ClinicalHistoryTabs({ history, patientId, currentDoctorId, currentRole, onUpdate }: ClinicalHistoryTabsProps) {
   const [activeTab, setActiveTab] = useState<Tab>("Antecedentes");
   const [background, setBackground] = useState(history.background ?? "");
   const [isSavingBg, setIsSavingBg] = useState(false);
@@ -110,7 +112,13 @@ export function ClinicalHistoryTabs({ history, patientId, onUpdate }: ClinicalHi
       {activeTab === "Notas" && (
         <div className="space-y-4">
           <ClinicalNoteForm patientId={patientId} onSuccess={onUpdate} />
-          <ClinicalTimeline notes={history.notes} patientId={patientId} onDelete={onUpdate} />
+          <ClinicalTimeline
+            notes={history.notes}
+            patientId={patientId}
+            currentDoctorId={currentDoctorId}
+            currentRole={currentRole}
+            onDelete={onUpdate}
+          />
         </div>
       )}
 

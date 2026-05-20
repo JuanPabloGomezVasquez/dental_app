@@ -43,7 +43,8 @@ export function FileUploadSection({ files, patientId, onUpdate }: FileUploadSect
     });
     setIsUploading(false);
     if (!res.ok) {
-      toast.error("Error al subir el archivo");
+      const json = (await res.json().catch(() => ({}))) as { error?: string };
+      toast.error(json.error ?? "Error al subir el archivo");
       return;
     }
     setLabel("");
@@ -52,8 +53,13 @@ export function FileUploadSection({ files, patientId, onUpdate }: FileUploadSect
   }
 
   async function handleDelete(fileId: string) {
-    await fetch(`/api/patients/${patientId}/files?fileId=${fileId}`, { method: "DELETE" });
+    const res = await fetch(`/api/patients/${patientId}/files?fileId=${fileId}`, { method: "DELETE" });
     setDeletingId(null);
+    if (!res.ok) {
+      const json = (await res.json().catch(() => ({}))) as { error?: string };
+      toast.error(json.error ?? "Error al eliminar el archivo");
+      return;
+    }
     onUpdate();
   }
 

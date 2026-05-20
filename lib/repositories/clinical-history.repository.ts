@@ -6,16 +6,20 @@ import type {
   UpdateBackgroundInput,
 } from "@/lib/validations/clinical-history.schema";
 
+export type NoteWithDoctor = ClinicalNote & { doctor: { name: string } | null };
+
 export type ClinicalHistoryFull = ClinicalHistory & {
-  notes: ClinicalNote[];
+  notes: NoteWithDoctor[];
   odontogram: OdontogramEntry[];
   files: PatientFile[];
 };
 
 interface ClinicalHistoryRepository {
   findByPatientId(patientId: string): Promise<ClinicalHistoryFull | null>;
+  findNoteById(noteId: string): Promise<ClinicalNote | null>;
   updateBackground(id: string, data: UpdateBackgroundInput): Promise<ClinicalHistory>;
-  addNote(clinicalHistoryId: string, data: CreateNoteInput): Promise<ClinicalNote>;
+  addNote(clinicalHistoryId: string, data: CreateNoteInput & { doctorId: string }): Promise<NoteWithDoctor>;
+  updateNote(noteId: string, content: string): Promise<NoteWithDoctor>;
   deleteNote(noteId: string): Promise<void>;
   upsertOdontogramEntry(
     clinicalHistoryId: string,
@@ -34,11 +38,18 @@ const repo: ClinicalHistoryRepository = {
     return db.clinicalHistory.findUnique({
       where: { patientId },
       include: {
-        notes: { orderBy: { createdAt: "desc" } },
+        notes: {
+          orderBy: { createdAt: "desc" },
+          include: { doctor: { select: { name: true } } },
+        },
         odontogram: true,
         files: { orderBy: { createdAt: "desc" } },
       },
     });
+  },
+
+  findNoteById(noteId) {
+    return db.clinicalNote.findUnique({ where: { id: noteId } });
   },
 
   updateBackground(id, data) {
@@ -46,7 +57,18 @@ const repo: ClinicalHistoryRepository = {
   },
 
   addNote(clinicalHistoryId, data) {
-    return db.clinicalNote.create({ data: { clinicalHistoryId, ...data } });
+    return db.clinicalNote.create({
+      data: { clinicalHistoryId, ...data },
+      include: { doctor: { select: { name: true } } },
+    });
+  },
+
+  updateNote(noteId, content) {
+    return db.clinicalNote.update({
+      where: { id: noteId },
+      data: { content },
+      include: { doctor: { select: { name: true } } },
+    });
   },
 
   async deleteNote(noteId) {

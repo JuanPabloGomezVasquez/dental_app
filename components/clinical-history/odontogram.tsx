@@ -49,7 +49,36 @@ function TeethRow({ teeth, entries, onSurfaceClick, readOnly }: TeethRowProps) {
   );
 }
 
+const STATUS_LABELS: Record<ToothStatus, string> = {
+  SANO: "Sano",
+  CARIES: "Caries",
+  OBTURACION: "Obturación",
+  CORONA: "Corona",
+  ENDODONCIA: "Endodoncia",
+  IMPLANTE: "Implante",
+  AUSENTE: "Ausente",
+  EXTRAIDO: "Extraído",
+  FRACTURA: "Fractura",
+};
+
+const SURFACE_LABELS: Record<Surface, string> = {
+  OCLUSAL: "Oclusal",
+  MESIAL: "Mesial",
+  DISTAL: "Distal",
+  VESTIBULAR: "Vestibular",
+  LINGUAL: "Lingual",
+};
+
 export function Odontogram({ entries, onSurfaceClick, readOnly }: OdontogramProps) {
+  const findings = entries.filter((e) => e.status !== "SANO");
+  const byTooth = findings.reduce<Record<number, OdontogramEntry[]>>((acc, e) => {
+    (acc[e.toothNumber] ??= []).push(e);
+    return acc;
+  }, {});
+  const toothNumbers = Object.keys(byTooth)
+    .map(Number)
+    .sort((a, b) => a - b);
+
   return (
     <div className="overflow-x-auto">
       <div className="flex flex-col items-center gap-1 min-w-max">
@@ -76,6 +105,38 @@ export function Odontogram({ entries, onSurfaceClick, readOnly }: OdontogramProp
           </div>
         ))}
       </div>
+
+      {toothNumbers.length > 0 && (
+        <div className="mt-4">
+          <h3 className="text-sm font-medium text-gray-700 mb-2">Hallazgos registrados</h3>
+          <table className="w-full text-xs border-collapse">
+            <thead>
+              <tr className="bg-gray-50">
+                <th className="border border-gray-200 px-2 py-1 text-left font-medium text-gray-600">Diente</th>
+                <th className="border border-gray-200 px-2 py-1 text-left font-medium text-gray-600">Superficie</th>
+                <th className="border border-gray-200 px-2 py-1 text-left font-medium text-gray-600">Estado</th>
+                <th className="border border-gray-200 px-2 py-1 text-left font-medium text-gray-600">Nota</th>
+              </tr>
+            </thead>
+            <tbody>
+              {toothNumbers.flatMap((t) =>
+                (byTooth[t] ?? []).map((e) => (
+                  <tr key={e.id} className="even:bg-gray-50">
+                    <td className="border border-gray-200 px-2 py-1 font-medium">{t}</td>
+                    <td className="border border-gray-200 px-2 py-1">{SURFACE_LABELS[e.surface]}</td>
+                    <td className="border border-gray-200 px-2 py-1">{STATUS_LABELS[e.status]}</td>
+                    <td className="border border-gray-200 px-2 py-1 text-gray-500">{e.note ?? "—"}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {findings.length === 0 && (
+        <p className="mt-4 text-xs text-gray-400">Sin hallazgos registrados.</p>
+      )}
     </div>
   );
 }

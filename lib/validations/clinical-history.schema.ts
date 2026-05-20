@@ -4,7 +4,6 @@ import { NoteType, Surface, ToothStatus } from "@prisma/client";
 export const createNoteSchema = z.object({
   type: z.nativeEnum(NoteType),
   content: z.string().min(1, "El contenido es requerido").max(5000),
-  doctorId: z.string().min(1, "Doctor requerido"),
 });
 
 export const createOdontogramEntrySchema = z.object({

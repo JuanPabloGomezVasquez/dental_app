@@ -2,7 +2,6 @@
 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { NoteType } from "@prisma/client";
 import { createNoteSchema, type CreateNoteInput } from "@/lib/validations/clinical-history.schema";
@@ -15,29 +14,18 @@ const NOTE_TYPE_LABELS: Record<NoteType, string> = {
   EGRESO: "Egreso",
 };
 
-type ActiveDoctor = { id: string; name: string };
-
 interface ClinicalNoteFormProps {
   patientId: string;
   onSuccess: () => void;
 }
 
 export function ClinicalNoteForm({ patientId, onSuccess }: ClinicalNoteFormProps) {
-  const [doctors, setDoctors] = useState<ActiveDoctor[]>([]);
-
   const {
     register,
     handleSubmit,
     reset,
     formState: { errors, isSubmitting },
   } = useForm<CreateNoteInput>({ resolver: zodResolver(createNoteSchema) });
-
-  useEffect(() => {
-    fetch("/api/admin/doctors/active")
-      .then((r) => r.json())
-      .then((data: ActiveDoctor[]) => setDoctors(data))
-      .catch(() => {});
-  }, []);
 
   async function onSubmit(data: CreateNoteInput) {
     const res = await fetch(`/api/patients/${patientId}/notes`, {
@@ -61,45 +49,21 @@ export function ClinicalNoteForm({ patientId, onSuccess }: ClinicalNoteFormProps
       className="border border-gray-200 rounded-lg p-4 space-y-3 bg-white"
     >
       <p className="text-sm font-medium text-gray-700">Agregar nota</p>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label htmlFor="note-type" className="text-xs font-medium text-gray-600">
-            Tipo
-          </label>
-          <select
-            id="note-type"
-            {...register("type")}
-            className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm"
-          >
-            {(Object.keys(NOTE_TYPE_LABELS) as NoteType[]).map((t) => (
-              <option key={t} value={t}>
-                {NOTE_TYPE_LABELS[t]}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label htmlFor="note-doctor" className="text-xs font-medium text-gray-600">
-            Doctor
-          </label>
-          <select
-            id="note-doctor"
-            {...register("doctorId")}
-            className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm"
-          >
-            <option value="">Seleccionar...</option>
-            {doctors.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name}
-              </option>
-            ))}
-          </select>
-          {errors.doctorId && (
-            <p role="alert" className="text-xs text-red-600 mt-0.5">
-              {errors.doctorId.message}
-            </p>
-          )}
-        </div>
+      <div>
+        <label htmlFor="note-type" className="text-xs font-medium text-gray-600">
+          Tipo
+        </label>
+        <select
+          id="note-type"
+          {...register("type")}
+          className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+        >
+          {(Object.keys(NOTE_TYPE_LABELS) as NoteType[]).map((t) => (
+            <option key={t} value={t}>
+              {NOTE_TYPE_LABELS[t]}
+            </option>
+          ))}
+        </select>
       </div>
       <div>
         <label htmlFor="note-content" className="text-xs font-medium text-gray-600">
