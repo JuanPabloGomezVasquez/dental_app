@@ -84,7 +84,7 @@ export function InventoryTable({
       ) : (
         <div className="overflow-x-auto rounded-lg border border-gray-200">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-xs font-medium text-gray-500 uppercase">
+            <thead className="bg-gray-50 text-xs font-medium text-gray-700 uppercase">
               <tr>
                 <th className="px-4 py-3 text-left">Nombre</th>
                 <th className="px-4 py-3 text-left">SKU</th>
@@ -103,7 +103,7 @@ export function InventoryTable({
                     <td className="px-4 py-3">
                       <p className="font-medium text-gray-900">{item.commercialName}</p>
                       {item.genericName && (
-                        <p className="text-xs text-gray-400">{item.genericName}</p>
+                        <p className="text-xs text-gray-600">{item.genericName}</p>
                       )}
                     </td>
                     <td className="px-4 py-3 text-gray-600">{item.sku}</td>
@@ -124,7 +124,7 @@ export function InventoryTable({
                         <button onClick={() => onUpdateStock(item)} className="text-xs text-gray-600 hover:underline">Stock</button>
                         <button
                           onClick={() => onToggleActive(item)}
-                          className={`text-xs hover:underline ${item.active ? "text-red-500" : "text-green-600"}`}
+                          className={`text-xs hover:underline ${item.active ? "text-red-700" : "text-green-700"}`}
                         >
                           {item.active ? "Desactivar" : "Activar"}
                         </button>

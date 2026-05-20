@@ -9,8 +9,9 @@ export function RipsExportForm() {
   const [dateFrom, setDateFrom] = useState(firstOfYear);
   const [dateTo, setDateTo] = useState(today);
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  function handleExport() {
+  async function handleExport() {
     setError(null);
     if (!dateFrom || !dateTo) {
       setError("Ingrese ambas fechas.");
@@ -20,7 +21,29 @@ export function RipsExportForm() {
       setError("La fecha de inicio no puede ser posterior a la fecha de fin.");
       return;
     }
-    window.open(`/api/rips/export?dateFrom=${dateFrom}&dateTo=${dateTo}`, "_blank");
+
+    setIsLoading(true);
+    try {
+      const res = await fetch(`/api/rips/export?dateFrom=${dateFrom}&dateTo=${dateTo}`);
+      if (!res.ok) {
+        const json = (await res.json()) as { error?: string };
+        setError(json.error ?? "Error al generar el archivo RIPS.");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `rips_${dateFrom}_${dateTo}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      setError("Error de red al intentar descargar el archivo.");
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
@@ -64,10 +87,11 @@ export function RipsExportForm() {
 
       <button
         type="button"
-        onClick={handleExport}
-        className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+        onClick={() => void handleExport()}
+        disabled={isLoading}
+        className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
       >
-        Descargar RIPS
+        {isLoading ? "Generando..." : "Descargar RIPS"}
       </button>
     </div>
   );
