@@ -1,6 +1,10 @@
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+function getResend() {
+  if (!process.env.RESEND_API_KEY) throw new Error("RESEND_API_KEY is not set");
+  return new Resend(process.env.RESEND_API_KEY);
+}
+
 const FROM = process.env.FROM_EMAIL ?? "DentApp <noreply@dentapp.com>";
 const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
 
@@ -9,7 +13,7 @@ export async function sendWelcomeDoctorEmail(
   name: string,
   tempPassword: string
 ): Promise<void> {
-  await resend.emails.send({
+  await getResend().emails.send({
     from: FROM,
     to,
     subject: "Tu acceso a DentApp",
@@ -34,7 +38,7 @@ export async function sendPasswordResetEmail(
   token: string
 ): Promise<void> {
   const resetUrl = `${APP_URL}/reset-password?token=${token}`;
-  await resend.emails.send({
+  await getResend().emails.send({
     from: FROM,
     to,
     subject: "Recuperar contraseña — DentApp",
