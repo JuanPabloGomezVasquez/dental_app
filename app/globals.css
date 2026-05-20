@@ -1,27 +1,197 @@
 @import "tailwindcss";
 @import "react-big-calendar/lib/css/react-big-calendar.css";
 
+/* ─── Design Tokens ─────────────────────────────────────────── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #F5F0E8;
+  --foreground: #1A1410;
+
+  /* Sidebar */
+  --sidebar-bg: #1B2E4B;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-text: rgba(255, 255, 255, 0.60);
+  --sidebar-text-active: #ffffff;
+  --sidebar-active-bg: rgba(255, 255, 255, 0.14);
+  --sidebar-hover-bg: rgba(255, 255, 255, 0.07);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-inter);
+
+  /* ── Warm gray scale ───────────────────────── */
+  --color-gray-50:  #F5F0E8;
+  --color-gray-100: #EDE5D8;
+  --color-gray-200: #DDD2C2;
+  --color-gray-300: #C9BAA6;
+  --color-gray-400: #8F7A68;
+  --color-gray-500: #6B5D50;
+  --color-gray-600: #524540;
+  --color-gray-700: #3D3330;
+  --color-gray-800: #2A211E;
+  --color-gray-900: #1A1410;
+
+  /* ── Deep navy blue ────────────────────────── */
+  --color-blue-50:  #EBF0F8;
+  --color-blue-100: #D3E1F4;
+  --color-blue-200: #A8C3EB;
+  --color-blue-300: #709FD9;
+  --color-blue-400: #3D7BC0;
+  --color-blue-500: #1E59A8;
+  --color-blue-600: #1B3A6B;
+  --color-blue-700: #122B52;
+  --color-blue-800: #0B1E3B;
+  --color-blue-900: #060F1E;
+
+  /* ── Green (success / habeas data) ─────────── */
+  --color-green-50:  #E6F4EC;
+  --color-green-100: #C8E8D4;
+  --color-green-200: #94D1AD;
+  --color-green-500: #2A7D4F;
+  --color-green-600: #226640;
+  --color-green-700: #1A5233;
+
+  /* ── Red (destructive) ─────────────────────── */
+  --color-red-50:  #FCECEA;
+  --color-red-100: #F8D4CF;
+  --color-red-200: #F0A89E;
+  --color-red-500: #C0392B;
+  --color-red-600: #A0311E;
+  --color-red-700: #842817;
+
+  /* ── Amber/Orange (warnings) ───────────────── */
+  --color-yellow-50:  #FDF5E6;
+  --color-yellow-100: #FAEACC;
+  --color-yellow-400: #E2A32A;
+  --color-yellow-700: #8F5A0A;
+  --color-orange-100: #FDE8D4;
+  --color-orange-700: #93420A;
+
+  /* ── Purple (super admin) ──────────────────── */
+  --color-purple-100: #EDE5F8;
+  --color-purple-600: #5E3DAE;
+  --color-purple-700: #4A2E8E;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+/* ─── Base ────────────────────────────────────────────────── */
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* ─── Sidebar nav ─────────────────────────────────────────── */
+.sidebar-link {
+  color: var(--sidebar-text);
+  transition: background 150ms, color 150ms;
+}
+.sidebar-link:hover {
+  background: var(--sidebar-hover-bg);
+  color: var(--sidebar-text-active);
+}
+.sidebar-link[data-active="true"] {
+  background: var(--sidebar-active-bg);
+  color: var(--sidebar-text-active);
+}
+
+/* ─── Scrollbar ───────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #C9BAA6;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #8F7A68;
+}
+
+/* ─── Focus ring global override ─────────────────────────── */
+*:focus-visible {
+  outline: 2px solid #3D7BC0;
+  outline-offset: 2px;
+}
+
+/* ─── React Big Calendar ──────────────────────────────────── */
+.rbc-calendar {
+  background: #ffffff;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  border: 1px solid #DDD2C2;
+}
+.rbc-toolbar {
+  padding: 0.75rem 1rem;
+  background: #ffffff;
+  border-bottom: 1px solid #DDD2C2;
+}
+.rbc-toolbar button {
+  color: #3D3330;
+  border: 1px solid #DDD2C2;
+  border-radius: 0.5rem;
+  background: #ffffff;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.875rem;
+  transition: background 0.15s;
+}
+.rbc-toolbar button:hover {
+  background: #EDE5D8;
+}
+.rbc-toolbar button.rbc-active {
+  background: #1B3A6B;
+  color: #ffffff;
+  border-color: #1B3A6B;
+}
+.rbc-header {
+  background: #F5F0E8;
+  border-color: #DDD2C2 !important;
+  padding: 0.5rem 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6B5D50;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.rbc-month-view,
+.rbc-time-view,
+.rbc-agenda-view {
+  border-color: #DDD2C2 !important;
+}
+.rbc-day-bg {
+  border-color: #DDD2C2 !important;
+}
+.rbc-today {
+  background: #EBF0F8 !important;
+}
+.rbc-off-range-bg {
+  background: #F5F0E8 !important;
+}
+.rbc-event {
+  background-color: #1B3A6B !important;
+  border: none !important;
+  border-radius: 4px !important;
+  font-size: 0.75rem !important;
+  padding: 2px 6px !important;
+}
+.rbc-event.rbc-selected {
+  background-color: #122B52 !important;
+}
+.rbc-show-more {
+  color: #1E59A8;
+  font-size: 0.75rem;
+}
+.rbc-time-slot {
+  border-color: #EDE5D8 !important;
+}
+.rbc-timeslot-group {
+  border-color: #DDD2C2 !important;
+}
+.rbc-time-header-content {
+  border-color: #DDD2C2 !important;
+}
+.rbc-current-time-indicator {
+  background-color: #C0392B;
 }

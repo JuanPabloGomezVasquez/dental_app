@@ -27,24 +27,40 @@ export default function Sidebar({
   const enabledSet = new Set(enabledModules);
 
   return (
-    <aside className="w-64 h-screen bg-white border-r border-gray-200 flex flex-col">
-      <div className="p-5 border-b border-gray-100">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center flex-shrink-0">
-            <span className="text-white font-bold text-sm">D</span>
-          </div>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-gray-900 truncate">
-              DentApp
-            </p>
-            <p className="text-xs text-gray-500 truncate">{userName}</p>
-          </div>
+    <aside
+      className="w-16 md:w-60 h-full flex flex-col flex-shrink-0"
+      style={{
+        background: "var(--sidebar-bg)",
+        borderRight: "1px solid var(--sidebar-border)",
+      }}
+    >
+      {/* Logo */}
+      <div
+        className="px-3 md:px-5 py-4 flex items-center gap-3"
+        style={{ borderBottom: "1px solid var(--sidebar-border)" }}
+      >
+        <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 bg-white/20">
+          <span className="text-white font-bold text-sm">D</span>
+        </div>
+        <div className="hidden md:block min-w-0">
+          <p className="text-sm font-semibold text-white truncate">DentApp</p>
+          <p
+            className="text-xs truncate"
+            style={{ color: "var(--sidebar-text)" }}
+          >
+            {userName}
+          </p>
         </div>
       </div>
 
-      <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-        <NavLink href={DASHBOARD_METADATA.href} label={DASHBOARD_METADATA.label} pathname={pathname}>
-          <DASHBOARD_METADATA.icon size={16} className="flex-shrink-0" />
+      {/* Navigation */}
+      <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
+        <NavLink
+          href={DASHBOARD_METADATA.href}
+          label={DASHBOARD_METADATA.label}
+          pathname={pathname}
+        >
+          <DASHBOARD_METADATA.icon size={18} className="flex-shrink-0" />
         </NavLink>
 
         {MODULE_ORDER.filter((mod) => enabledSet.has(mod)).map((mod) => {
@@ -52,27 +68,38 @@ export default function Sidebar({
           const Icon = meta.icon;
           const showBadge = mod === AppModule.INVENTORY && inventoryAlerts > 0;
           return (
-            <NavLink key={mod} href={meta.href} label={meta.label} pathname={pathname} badge={showBadge ? inventoryAlerts : undefined}>
-              <Icon size={16} className="flex-shrink-0" />
+            <NavLink
+              key={mod}
+              href={meta.href}
+              label={meta.label}
+              pathname={pathname}
+              badge={showBadge ? inventoryAlerts : undefined}
+            >
+              <Icon size={18} className="flex-shrink-0" />
             </NavLink>
           );
         })}
 
         {isAdmin && (
           <NavLink href="/admin" label="Administración" pathname={pathname}>
-            <Settings size={16} className="flex-shrink-0" />
+            <Settings size={18} className="flex-shrink-0" />
           </NavLink>
         )}
       </nav>
 
-      <div className="p-3 border-t border-gray-100">
+      {/* Logout */}
+      <div
+        className="px-2 py-3"
+        style={{ borderTop: "1px solid var(--sidebar-border)" }}
+      >
         <form action={logout}>
           <button
             type="submit"
-            className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+            title="Cerrar sesión"
+            className="sidebar-link flex items-center justify-center md:justify-start gap-3 w-full px-3 py-2 rounded-xl text-sm font-medium"
           >
             <LogOut size={16} />
-            <span>Cerrar sesión</span>
+            <span className="hidden md:block">Cerrar sesión</span>
           </button>
         </form>
       </div>
@@ -99,16 +126,14 @@ function NavLink({
   return (
     <Link
       href={href}
-      className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-        isActive
-          ? "bg-blue-50 text-blue-700"
-          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-      }`}
+      title={label}
+      data-active={isActive}
+      className="sidebar-link flex items-center justify-center md:justify-start gap-3 px-3 py-2 rounded-xl text-sm font-medium"
     >
       {children}
-      <span className="flex-1">{label}</span>
+      <span className="hidden md:block flex-1">{label}</span>
       {badge !== undefined && (
-        <span className="inline-flex items-center justify-center w-5 h-5 text-xs font-medium rounded-full bg-orange-100 text-orange-700">
+        <span className="hidden md:inline-flex items-center justify-center w-5 h-5 text-xs font-semibold rounded-full bg-orange-400/20 text-orange-300">
           {badge > 9 ? "9+" : badge}
         </span>
       )}
