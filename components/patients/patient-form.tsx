@@ -164,7 +164,7 @@ export function PatientForm({ open, patient, onSuccess, onClose }: PatientFormPr
               <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
                 Teléfono <span aria-hidden="true">*</span>
               </label>
-              <input id="phone" type="tel" {...register("phone")}
+              <input id="phone" type="tel" {...register("phone")} placeholder="3001234567"
                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
               {errors.phone && <p role="alert" className="mt-1 text-xs text-red-600">{errors.phone.message}</p>}
             </div>
@@ -173,7 +173,9 @@ export function PatientForm({ open, patient, onSuccess, onClose }: PatientFormPr
                 Fecha de nacimiento
               </label>
               <input id="birthDate" type="date" {...register("birthDate")}
+                max={new Date().toISOString().split("T")[0]}
                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              {errors.birthDate && <p role="alert" className="mt-1 text-xs text-red-600">{errors.birthDate.message}</p>}
             </div>
           </div>
 
@@ -195,16 +197,21 @@ export function PatientForm({ open, patient, onSuccess, onClose }: PatientFormPr
           )}
 
           {!isEditing && (
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                {...register("habeaDataConsent")}
-                className="mt-0.5 w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              <span className="text-sm text-gray-700">
-                El paciente ha firmado el consentimiento de Habeas Data (Ley 1581/2012)
-              </span>
-            </label>
+            <div>
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  {...register("habeaDataConsent")}
+                  className="mt-0.5 w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span className="text-sm text-gray-700">
+                  El paciente ha firmado el consentimiento de Habeas Data (Ley 1581/2012) <span aria-hidden="true" className="text-red-500">*</span>
+                </span>
+              </label>
+              {errors.habeaDataConsent && (
+                <p role="alert" className="mt-1 text-xs text-red-600">{errors.habeaDataConsent.message}</p>
+              )}
+            </div>
           )}
 
           {errors.root && (

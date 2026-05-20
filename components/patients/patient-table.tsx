@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import type { Patient } from "@prisma/client";
 import { SearchInput } from "@/components/ui/search-input";
@@ -10,6 +11,7 @@ interface PatientTableProps {
   total: number;
   page: number;
   pages: number;
+  search: string;
   onSearch: (search: string) => void;
   onPageChange: (page: number) => void;
   onEdit: (patient: Patient) => void;
@@ -21,17 +23,30 @@ export function PatientTable({
   total,
   page,
   pages,
+  search,
   onSearch,
   onPageChange,
   onEdit,
   onViewHistory,
 }: PatientTableProps) {
+  const [localSearch, setLocalSearch] = useState(search);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Keep local search in sync when URL-driven search changes externally
+  useEffect(() => { setLocalSearch(search); }, [search]);
+
+  function handleChange(value: string) {
+    setLocalSearch(value);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => onSearch(value), 300);
+  }
+
   return (
     <div className="space-y-4">
       <div className="w-72">
         <SearchInput
-          value=""
-          onChange={onSearch}
+          value={localSearch}
+          onChange={handleChange}
           placeholder="Buscar por nombre, apellido o cédula..."
         />
       </div>
@@ -62,6 +77,7 @@ export function PatientTable({
                         {`${patient.lastName}, ${patient.firstName}`}
                         {!patient.habeaDataConsent && (
                           <span
+                            role="img"
                             className="w-2 h-2 rounded-full bg-yellow-400 flex-shrink-0"
                             title="Sin consentimiento Habeas Data"
                             aria-label="Sin consentimiento Habeas Data"

@@ -71,6 +71,7 @@ export function PatientsPageClient({ data, search }: PatientsPageClientProps) {
           total={data.total}
           page={data.page}
           pages={data.pages}
+          search={search}
           onSearch={handleSearch}
           onPageChange={handlePageChange}
           onEdit={handleEdit}

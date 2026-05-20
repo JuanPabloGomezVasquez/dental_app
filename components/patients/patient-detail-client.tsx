@@ -9,6 +9,8 @@ import { PdfExportButton } from "@/components/clinical-history/pdf-export-button
 interface PatientDetailClientProps {
   patient: Patient;
   history: ClinicalHistoryFull;
+  currentDoctorId: string | null;
+  currentRole: string;
 }
 
 function calculateAge(birthDate: Date | null): string | null {
@@ -23,7 +25,7 @@ function calculateAge(birthDate: Date | null): string | null {
   return `${adjusted} años`;
 }
 
-export function PatientDetailClient({ patient, history }: PatientDetailClientProps) {
+export function PatientDetailClient({ patient, history, currentDoctorId, currentRole }: PatientDetailClientProps) {
   const router = useRouter();
   const age = calculateAge(patient.birthDate);
 
@@ -39,6 +41,8 @@ export function PatientDetailClient({ patient, history }: PatientDetailClientPro
       <ClinicalHistoryTabs
         history={history}
         patientId={patient.id}
+        currentDoctorId={currentDoctorId}
+        currentRole={currentRole}
         onUpdate={() => router.refresh()}
       />
     </div>
