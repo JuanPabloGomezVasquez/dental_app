@@ -61,17 +61,27 @@ model DoctorModulePermission {
 }
 
 model User {
-  id             String        @id @default(cuid())
-  email          String        @unique
-  hashedPassword String
-  name           String
-  role           UserRole      @default(ADMIN)
-  active         Boolean       @default(true)
-  organizationId String?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-  organization   Organization? @relation(fields: [organizationId], references: [id])
-  doctor         Doctor?       @relation("UserDoctor")
+  id                  String               @id @default(cuid())
+  email               String               @unique
+  hashedPassword      String
+  name                String
+  role                UserRole             @default(ADMIN)
+  active              Boolean              @default(true)
+  organizationId      String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  organization        Organization?        @relation(fields: [organizationId], references: [id])
+  doctor              Doctor?              @relation("UserDoctor")
+  passwordResetTokens PasswordResetToken[]
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Doctor {
@@ -89,6 +99,7 @@ model Doctor {
   user              User?                    @relation("UserDoctor", fields: [userId], references: [id])
   appointments      Appointment[]
   modulePermissions DoctorModulePermission[]
+  clinicalNotes     ClinicalNote[]
 }
 
 model Procedure {
@@ -166,6 +177,7 @@ model ClinicalNote {
   content           String
   createdAt         DateTime        @default(now())
   clinicalHistory   ClinicalHistory @relation(fields: [clinicalHistoryId], references: [id])
+  doctor            Doctor          @relation(fields: [doctorId], references: [id])
 }
 
 enum NoteType {
