@@ -141,13 +141,73 @@ Old sessions missing `organizationId` → `verifySession()` redirects to `/login
 
 | File | What it does |
 |---|---|
-| `app/actions/auth.ts` | Server Actions: `login()` validates credentials, resolves role/org/doctorId, creates JWT session, redirects by role; `logout()` clears cookie |
-| `lib/session.ts` | `encrypt()` / `decrypt()` JWT with Jose HS256 7d; `createSession(payload)` includes role, organizationId, doctorId |
-| `lib/dal.ts` | `verifySession()` — reads cookie, verifies JWT, redirects to `/login` if invalid or missing organizationId; `verifyAdmin()` — throws ForbiddenError if role ≠ ADMIN |
-| `app/(auth)/login/page.tsx` | Login page using `useActionState(login)` |
+| `app/actions/auth.ts` | `login()`: validates credentials, checks org active, if `totpEnabled` sets `pending_2fa` cookie and returns `requires2fa: true`; otherwise creates session and redirects by role. `verify2fa()`: reads (but does NOT consume) `pending_2fa` cookie, decrypts TOTP secret, verifies code with ±30s tolerance, then deletes cookie and creates full session. `logout()` writes audit log then clears cookie. |
+| `lib/session.ts` | `encrypt()` / `decrypt()` JWT with Jose HS256 8h; `createSession(payload)` includes `lastActivity` unix ms for inactivity tracking |
+| `lib/session-edge.ts` | Edge-safe (`encryptEdge` / `decryptEdge`) — used only by `proxy.ts` |
+| `proxy.ts` | Replaces `middleware.ts`. Runs on every request (except static/image/favicon). Checks `lastActivity` (30 min inactivity limit) and absolute session age (8 h). On valid session: re-signs JWT with updated `lastActivity` (sliding window). Exempts `/api/auth/**` and `/api/inngest` from auth redirect. |
+| `lib/dal.ts` | `verifySession()` — reads cookie, verifies JWT, redirects to `/login` if missing `organizationId` or role is `SUPER_ADMIN`; `assertAdmin()` — throws ForbiddenError if role ≠ ADMIN; `getSession()` — non-throwing reader used by logout audit |
+| `app/(auth)/login/login-form.tsx` | `useActionState(login)` / `useActionState(verify2fa)`. When `state.requires2fa === true` shows TOTP input step (6-digit, digit-only, monospace). |
 | `app/(dashboard)/layout.tsx` | Calls `verifySession()` + `getAccessibleModules()` + `getLowStockCount()` → renders `<Sidebar enabledModules isAdmin>` |
 
-**Cookie:** name `session`, HTTP-only, SameSite lax, 7-day expiry
+**Cookies:**
+- `session` — HTTP-only, SameSite lax, `maxAge: SESSION_INACTIVITY_MS / 1000` (30 min sliding). Re-signed on every proxied request.
+- `pending_2fa` — HTTP-only, 5 min TTL, signed JWT containing `userId`. Created by `login()` when 2FA is required; read (non-consuming) on each `verify2fa()` attempt; deleted only on success.
+
+**Session constants (`lib/session.ts`):**
+- `SESSION_INACTIVITY_MS` = 30 min — idle timeout enforced by proxy
+- `SESSION_MAX_AGE_MS` = 8 h — absolute maximum regardless of activity
+
+---
+
+## Security Module
+
+### Audit Logs
+
+**Coverage:** Every authentication event (LOGIN, LOGIN_FAILED, LOGOUT) and all patient data operations (PATIENT_CREATED/UPDATED/VIEWED/ANONYMIZED/EXPORTED, CLINICAL_NOTE_CREATED/DELETED, FILE_UPLOADED/DELETED) write an `AuditLog` row.
+
+| File | Role |
+|---|---|
+| `lib/audit.ts` | `writeAuditLog(params)` — fire-and-forget, never throws. `requestMeta(req)` extracts IP + UA from HTTP request. `serverActionMeta()` extracts IP + UA from `next/headers` (server actions). |
+| `lib/repositories/audit.repository.ts` | `auditRepository.create()` — thin wrapper around `db.auditLog.create()`. |
+| `prisma/schema.prisma` | `AuditLog` model + `AuditAction` enum. |
+
+**Key invariant:** `writeAuditLog` uses `.catch(() => {})` — a DB failure writing an audit log must NEVER propagate to the caller.
+
+### Two-Factor Authentication (TOTP)
+
+**UI route:** `/security` — shows 2FA status; all roles can access it.
+
+**API routes:**
+| Route | Method | What it does |
+|---|---|---|
+| `/api/auth/totp/setup` | GET | Generates secret, stores PLAIN temporarily in `user.totpSecret`, returns QR data URL |
+| `/api/auth/totp/enable` | POST | Verifies first code against plain secret, then AES-encrypts and saves; sets `totpEnabled = true` |
+| `/api/auth/totp/disable` | DELETE | Requires current password + valid TOTP code; clears `totpSecret` and sets `totpEnabled = false` |
+
+**Service (`lib/services/totp.service.ts`):**
+- `generateSecret()` / `getOtpauthUrl(email, secret)` / `getQrDataUrl(url)` — setup helpers
+- `verifyToken(token, secret)` — checks current ±1 time step (±30s tolerance for clock drift)
+- `encryptSecret(plain)` / `decryptSecret(encrypted)` — AES-256-GCM via `lib/crypto.ts`
+
+**Secret lifecycle:**
+1. `GET /setup` → plain secret stored in `user.totpSecret`
+2. `POST /enable` → verified against plain, then encrypted; `totpEnabled = true`
+3. Login `verify2fa` → decrypts, verifies, creates session
+4. `DELETE /disable` → password + TOTP confirmed, fields cleared
+
+**Client components (`components/security/`, `components/auth/`):**
+- `security-page-client.tsx` — wraps server-read state + `router.refresh()` on change
+- `totp-setup.tsx` — 3-step UI: idle → QR scan → enter code to confirm
+
+### Backups (3 levels)
+
+| Level | Mechanism | Config needed |
+|---|---|---|
+| 1 — PITR | Neon Scale plan → Point-in-Time Recovery (up to 30 days) | Upgrade plan in console.neon.tech |
+| 2 — Weekly JSON | `inngest/weekly-backup.ts` cron (Sun 02:00 UTC): exports all Prisma models to `backups/{ts}/database.json` in Cloudflare R2 | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME` |
+| 3 — Blob index | Same Inngest function: paginates Vercel Blob `list()` and writes index to `backups/{ts}/blob-index.json` in R2 | Same R2 env vars |
+
+**Inngest function:** `weeklyBackupFn` registered in `app/api/inngest/route.ts`.
 
 ---
 
@@ -380,13 +440,16 @@ Old sessions missing `organizationId` → `verifySession()` redirects to `/login
 | File | Purpose |
 |---|---|
 | `lib/db.ts` | PrismaClient singleton (hot-reload safe) |
-| `lib/session.ts` | JWT HS256 — `createSession()`, `deleteSession()`, `encrypt()`, `decrypt()` |
-| `lib/dal.ts` | `verifySession()` → `DashboardSessionUser` (blocks SUPER_ADMIN); `verifySuperAdmin()` → `SuperAdminSessionUser`; `assertAdmin()` — ADMIN-only guard within dashboard |
-| `lib/crypto.ts` | AES-256-GCM field encryption |
+| `lib/session.ts` | JWT HS256 — `createSession()`, `deleteSession()`, `encrypt()`, `decrypt()`, `SESSION_INACTIVITY_MS`, `SESSION_MAX_AGE_MS` |
+| `lib/session-edge.ts` | Edge-safe JWT helpers — `encryptEdge()`, `decryptEdge()` — used only by `proxy.ts` |
+| `lib/dal.ts` | `verifySession()` → `DashboardSessionUser`; `verifySuperAdmin()` → `SuperAdminSessionUser`; `assertAdmin()`; `getSession()` (non-throwing) |
+| `lib/crypto.ts` | AES-256-GCM field encryption — `encrypt()`, `decrypt()`, `encryptOptional()`, `decryptOptional()`. Key: `FIELD_ENCRYPTION_KEY` (64 hex chars) |
+| `lib/audit.ts` | Fire-and-forget audit log writer + `requestMeta()` + `serverActionMeta()` |
 | `lib/errors.ts` | `AppError`, `ValidationError`, `NotFoundError`, `ConflictError`, `ForbiddenError`, `handleApiError()` |
 | `lib/env.ts` | Validates optional env vars in production (warn, no throw) |
 | `lib/modules.ts` | `server-only` — `getAccessibleModules()`, `assertModuleAccess()`, re-exports metadata |
 | `lib/module-metadata.ts` | Client-safe — `MODULE_METADATA`, `MODULE_ORDER`, `DASHBOARD_METADATA`, `AppModule` |
+| `proxy.ts` | Next.js 16 proxy (replaces `middleware.ts`). Sliding-window session + inactivity/absolute expiry checks. Exports `proxy` function (not `middleware`). |
 
 ---
 
@@ -452,10 +515,12 @@ InventoryCategory → InventoryItem → StockLog[]   (all with organizationId)
 | File | What it covers |
 |---|---|
 | `tests/unit/lib/modules.test.ts` | `getAccessibleModules` (ADMIN returns org modules; DOCTOR returns intersection; null doctorId → empty); `assertModuleAccess` (pass / throw ForbiddenError) |
+| `tests/unit/lib/audit.test.ts` | `writeAuditLog` calls repository with correct params; never throws when repository fails; coerces null organizationId. `requestMeta` extracts IP (x-forwarded-for / x-real-ip fallback) and user-agent. |
 | `tests/unit/services/org-modules.service.test.ts` | `getOrgModules` fills missing modules with false; `setOrgModule(false)` cascades disable to doctors; `getDoctorModulePerms` combines org + doctor state; `setDoctorModulePerm` rejects when org module disabled |
 | `tests/unit/services/appointments.service.test.ts` | DOCTOR always uses own doctorId (ignores filterDoctorId); ADMIN without filter → undefined; organizationId forwarded to repository |
 | `tests/unit/services/patients.service.test.ts` | DOCTOR fetches patientIds from appointments first; ADMIN does not; correct pagination (pages = ceil(total/pageSize)) |
 | `tests/unit/services/superadmin.service.test.ts` | `listOrganizations` maps counts + enabledModules; `getOrgDetail` fills all modules; `createOrganization` checks slug+email uniqueness, creates all 5 OrgModule rows; `updateOrganization` guards NotFoundError; `setOrgModule` cascades disable to doctor perms |
+| `tests/unit/services/totp.service.test.ts` | `generateSecret` / `getOtpauthUrl` / `getQrDataUrl`; `verifyToken` correct/incorrect/rejects-gracefully, checks 3 time steps (±30s drift), short-circuits on first match, uses epoch in seconds; `encryptSecret`/`decryptSecret` round-trip |
 
 **Mock contract:** Prisma queries filter with `where: { enabled: true }` — mocks must only return enabled=true rows to accurately simulate DB behavior.
 
@@ -474,6 +539,7 @@ InventoryCategory → InventoryItem → StockLog[]   (all with organizationId)
 - `e2e/flows/module-gating.spec.ts` — sidebar shows/hides Caja link when module toggled; direct URL to disabled module → 403; admin panel always accessible; afterAll re-enables CAJA
 - `e2e/flows/doctor-login.spec.ts` — `test.use({ storageState: { cookies: [], origins: [] } })` (no admin session); creates Doctor + User via Prisma; doctor with no modules → `/no-access`; doctor with APPOINTMENTS → `/appointments`
 - `e2e/flows/superadmin.spec.ts` — super admin login → `/superadmin/organizations`; clinic admin blocked from superadmin routes; org creation (slug + admin user); module toggle persists in DB; org suspension/activation; suspended org blocks user login
+- `e2e/flows/security.spec.ts` — "Seguridad" link visible in sidebar; `/security` page renders; 2FA status shown; clicking setup shows QR image. Full 2FA login flow (requires live TOTP code) is covered by unit tests + manual QA.
 - `e2e/a11y/accessibility.spec.ts` — axe-playwright, WCAG 2.1 A/AA, critical/serious impacts only
 - `e2e/ux/error-messages.spec.ts` — Spanish error messages, duplicate ID number
 - `e2e/ux/responsive.spec.ts` — patient/inventory/billing tables visible at 768px
@@ -505,12 +571,17 @@ InventoryCategory → InventoryItem → StockLog[]   (all with organizationId)
 | Variable | Required | Used by |
 |---|---|---|
 | `DATABASE_URL` | Always | Prisma |
-| `SESSION_SECRET` | Always | JWT HS256 (≥32 chars) |
-| `FIELD_ENCRYPTION_KEY` | Always | AES-256-GCM (64 hex chars) |
+| `SESSION_SECRET` | Always | JWT HS256 session + `pending_2fa` cookie (≥32 chars) |
+| `FIELD_ENCRYPTION_KEY` | Always | AES-256-GCM for PII fields AND TOTP secrets (64 hex chars) |
 | `NEXTAUTH_URL` | Always | Base URL |
 | `ANTHROPIC_API_KEY` | For AI | Claude SDK |
 | `BLOB_READ_WRITE_TOKEN` | For file uploads | Vercel Blob |
-| `INNGEST_EVENT_KEY` / `INNGEST_SIGNING_KEY` | Prod | Inngest |
+| `INNGEST_SIGNING_KEY` | Prod | Inngest webhook auth — required for `/api/inngest` to accept calls |
+| `INNGEST_EVENT_KEY` | Prod (optional) | Only needed if sending events via `inngest.send()` from app code |
+| `R2_ACCOUNT_ID` | Backups | Cloudflare R2 — weekly database backup |
+| `R2_ACCESS_KEY_ID` | Backups | Cloudflare R2 API key |
+| `R2_SECRET_ACCESS_KEY` | Backups | Cloudflare R2 secret |
+| `R2_BUCKET_NAME` | Backups | R2 bucket name (e.g. `dentapp-backups`) |
 | `WHATSAPP_ACCESS_TOKEN` / `_PHONE_NUMBER_ID` / `_TEMPLATE_NAME` | Prod | Meta Graph API |
 | `SIIGO_API_KEY` / `SIIGO_ACCOUNT_ID` | Prod | Invoicing |
 | `NIT_CONSULTORIO` / `RIPS_MUNICIPIO_CODE` / `RIPS_COD_PRESTADOR` | RIPS | RIPS export |

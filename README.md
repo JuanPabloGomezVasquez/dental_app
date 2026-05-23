@@ -10,7 +10,10 @@ A full-stack practice management system for dental clinics built with Next.js 16
 |---|---|
 | **Multi-tenancy** | Each clinic is an isolated tenant (Organization); all data scoped by `organizationId`; module activation per clinic |
 | **Super Admin Panel** | Platform-owner panel at `/superadmin`; create/suspend organizations, configure contracted modules per clinic |
-| **Authentication** | JWT sessions with bcrypt password hashing, HTTP-only cookies, 7-day expiry; `SUPER_ADMIN`, `ADMIN`, and `DOCTOR` roles |
+| **Authentication** | JWT sessions with bcrypt password hashing, HTTP-only cookies; sliding inactivity window (30 min) + absolute limit (8 h) enforced by `proxy.ts`; `SUPER_ADMIN`, `ADMIN`, and `DOCTOR` roles |
+| **Two-Factor Auth (TOTP)** | Optional per-user TOTP 2FA (Google Authenticator, Authy); QR setup flow; TOTP secret encrypted at rest (AES-256-GCM); ±30s clock drift tolerance; retry-safe (pending cookie survives failed attempts) |
+| **Audit Logs** | Every auth event and patient data operation writes an `AuditLog` row; fire-and-forget so DB failures never break app flow |
+| **Backups** | 3-level: Neon PITR (plan-level), weekly Inngest cron exporting all data to Cloudflare R2 JSON, plus Vercel Blob file index backup |
 | **Module Gating** | Two-level: org enables modules (contracted features), doctor gets granted subset; sidebar and routes enforce access |
 | **Doctor Login** | Doctors log in via the same `/login` page; redirected to first accessible module or `/no-access`; managed by admin |
 | **Administration** | Doctors and procedures CRUD with soft-delete and active/inactive toggle; doctor login and module permission management |
@@ -22,7 +25,7 @@ A full-stack practice management system for dental clinics built with Next.js 16
 | **AI Assistant** | Claude-powered chat with read/write tools and human-in-the-loop confirmation for write actions; org-scoped |
 | **Legal Compliance** | AES-256-GCM field-level encryption for PII, data export, patient anonymization, RIPS export (Resolution 2275/2023) |
 | **WhatsApp** | Automated 24-hour appointment reminders via Inngest job queue + Meta Graph API |
-| **QA Suite** | Vitest unit tests + Playwright E2E tests: user flows, module gating, doctor login, WCAG 2.1 accessibility audits |
+| **QA Suite** | Vitest unit tests (services, modules, TOTP service, audit helpers) + Playwright E2E tests: user flows, module gating, doctor login, security page, WCAG 2.1 accessibility audits |
 
 ---
 
@@ -185,8 +188,12 @@ Copy `.env.example` to `.env.local` and set the following:
 
 | Variable | Description |
 |---|---|
-| `INNGEST_EVENT_KEY` | Inngest event key — [app.inngest.com](https://app.inngest.com) |
-| `INNGEST_SIGNING_KEY` | Inngest signing key |
+| `INNGEST_SIGNING_KEY` | Inngest signing key — required for `/api/inngest` webhook authentication |
+| `INNGEST_EVENT_KEY` | Inngest event key — only required if sending events from app code |
+| `R2_ACCOUNT_ID` | Cloudflare R2 account ID (weekly backup cron) |
+| `R2_ACCESS_KEY_ID` | Cloudflare R2 API key ID |
+| `R2_SECRET_ACCESS_KEY` | Cloudflare R2 secret access key |
+| `R2_BUCKET_NAME` | R2 bucket name (e.g. `dentapp-backups`) |
 | `WHATSAPP_ACCESS_TOKEN` | Meta Graph API permanent token |
 | `WHATSAPP_PHONE_NUMBER_ID` | WhatsApp Business phone number ID |
 | `WHATSAPP_TEMPLATE_NAME` | Approved Meta message template name |
