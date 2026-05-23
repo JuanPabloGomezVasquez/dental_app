@@ -3,14 +3,17 @@ import { db, getDefaultOrgId } from "../fixtures/db";
 
 test.describe("Flujo: registro de pago completo", () => {
   let patientId: string | undefined;
+  let testDescription: string;
 
   test.beforeAll(async () => {
+    const ts = Date.now();
+    testDescription = `Limpieza dental E2E-${ts}`;
     const organizationId = await getDefaultOrgId();
     const patient = await db.patient.create({
       data: {
         firstName: "Paciente",
         lastName: "Test",
-        idNumber: `CAJA-${Date.now()}`,
+        idNumber: `CAJA-${ts}`,
         phone: "3009999999",
         habeaDataConsent: true,
         organizationId,
@@ -39,7 +42,7 @@ test.describe("Flujo: registro de pago completo", () => {
     await expect(patientSelect.locator("option").nth(1)).toBeAttached({ timeout: 5000 });
     await patientSelect.selectOption({ label: "Test, Paciente" });
 
-    await page.locator('textarea[name="description"]').fill("Limpieza dental E2E");
+    await page.locator('textarea[name="description"]').fill(testDescription);
     await page.locator('input[name="total"]').fill("200000");
     await page.locator('input[name="initialPayment"]').fill("50000");
 
@@ -51,14 +54,20 @@ test.describe("Flujo: registro de pago completo", () => {
     await page.getByRole("button", { name: "Crear registro" }).click();
 
     await expect(page.getByText(/Abono Parcial/i).first()).toBeVisible({ timeout: 10000 });
-    await expect(page.getByText(/150\.000|150,000/i)).toBeVisible();
+    await expect(page.getByText(/150\.000|150,000/i).first()).toBeVisible();
 
     // Target the specific row by description to avoid clicking on other records
-    const recordRow = page.locator("tr").filter({ hasText: "Limpieza dental E2E" });
+    const recordRow = page.locator("tr").filter({ hasText: testDescription });
     await recordRow.getByRole("button", { name: "Ver detalle" }).click();
 
-    // PaymentForm is embedded directly in the detail panel
-    await page.locator('input[name="amount"]').fill("150000");
+    // Wait for the modal dialog to open before interacting with the form inside
+    await expect(page.getByRole("dialog")).toBeVisible({ timeout: 5000 });
+
+    // PaymentForm is at the bottom of the modal's scrollable content — scroll it
+    // into view before filling (required on narrow/tablet viewports)
+    const amountInput = page.locator('input[name="amount"]');
+    await amountInput.scrollIntoViewIfNeeded();
+    await amountInput.fill("150000");
     await page.locator('select[name="method"]').selectOption("TRANSFERENCIA");
     await page.getByRole("button", { name: "Registrar abono" }).click();
 
