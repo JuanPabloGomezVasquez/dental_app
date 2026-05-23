@@ -113,7 +113,7 @@ export function TodaySchedule({
                 <div className="flex-shrink-0 w-14">
                   <p
                     className={`text-sm font-semibold tabular-nums ${
-                      isPast ? "text-gray-400" : "text-gray-900"
+                      isPast ? "text-gray-500" : "text-gray-900"
                     }`}
                   >
                     {formatTimeBogota(apt.date)}
