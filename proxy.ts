@@ -13,9 +13,11 @@ export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const isPublicRoute = /^\/(?:login|forgot-password|reset-password)/.test(path);
   const isApiAuthRoute = path.startsWith("/api/auth");
+  // Inngest handles its own auth via signing key — must not redirect to login
+  const isInngestRoute = path.startsWith("/api/inngest");
 
   // No session on a protected route — redirect to login
-  if (!payload && !isPublicRoute && !isApiAuthRoute) {
+  if (!payload && !isPublicRoute && !isApiAuthRoute && !isInngestRoute) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
@@ -24,8 +26,8 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
-  // No session on public/api routes — pass through unchanged
-  if (!payload) return NextResponse.next();
+  // No session on public/api/inngest routes — pass through unchanged
+  if (!payload || isInngestRoute) return NextResponse.next();
 
   const now = Date.now();
   const issuedAt =
