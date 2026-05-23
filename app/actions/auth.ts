@@ -44,17 +44,21 @@ async function setPending2faCookie(userId: string) {
   });
 }
 
-async function consumePending2faCookie(): Promise<string | null> {
+async function readPending2faCookie(): Promise<string | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get("pending_2fa")?.value;
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, getPendingKey(), { algorithms: ["HS256"] });
-    cookieStore.delete("pending_2fa");
     return typeof payload.userId === "string" ? payload.userId : null;
   } catch {
     return null;
   }
+}
+
+async function deletePending2faCookie(): Promise<void> {
+  const cookieStore = await cookies();
+  cookieStore.delete("pending_2fa");
 }
 
 export async function login(
@@ -153,7 +157,7 @@ export async function verify2fa(
     return { error: "Código inválido" };
   }
 
-  const userId = await consumePending2faCookie();
+  const userId = await readPending2faCookie();
   if (!userId) {
     return { error: "Sesión expirada. Vuelve a iniciar sesión." };
   }
@@ -164,6 +168,7 @@ export async function verify2fa(
   });
 
   if (!user || !user.active || !user.totpEnabled || !user.totpSecret) {
+    await deletePending2faCookie();
     return { error: "Error de autenticación. Vuelve a intentarlo." };
   }
 
@@ -177,8 +182,12 @@ export async function verify2fa(
       organizationId: user.organizationId,
       ...meta,
     });
+    // Cookie stays alive so user can retry without re-entering email/password
     return { error: "Código incorrecto. Intenta de nuevo." };
   }
+
+  // Correct code — consume the pending cookie before creating the real session
+  await deletePending2faCookie();
 
   const role = user.role === "DOCTOR" ? "DOCTOR" : user.role === "SUPER_ADMIN" ? "SUPER_ADMIN" : "ADMIN";
   const doctorId = user.doctor?.id ?? null;
