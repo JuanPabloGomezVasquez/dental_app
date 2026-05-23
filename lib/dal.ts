@@ -72,3 +72,8 @@ export function assertAdmin(role: "ADMIN" | "DOCTOR"): void {
     throw new ForbiddenError("Solo los administradores pueden realizar esta acción");
   }
 }
+
+/** Read session without enforcing — returns null when not authenticated. */
+export async function getSession() {
+  return getDecryptedSession();
+}

@@ -4,6 +4,7 @@ import { getAccessibleModules, assertModuleAccess, AppModule } from "@/lib/modul
 import { patientsService } from "@/lib/services/patients.service";
 import { createPatientSchema } from "@/lib/validations/patient.schema";
 import { handleApiError } from "@/lib/errors";
+import { writeAuditLog, requestMeta } from "@/lib/audit";
 
 export async function GET(request: NextRequest): Promise<Response> {
   const session = await verifySession();
@@ -41,6 +42,15 @@ export async function POST(request: NextRequest): Promise<Response> {
 
   try {
     const patient = await patientsService.create(parsed.data, session.organizationId);
+    writeAuditLog({
+      userId: session.userId,
+      userEmail: session.email,
+      action: "PATIENT_CREATED",
+      resource: "Patient",
+      resourceId: patient.id,
+      organizationId: session.organizationId,
+      ...requestMeta(request),
+    });
     return Response.json(patient, { status: 201 });
   } catch (error) {
     return handleApiError(error);

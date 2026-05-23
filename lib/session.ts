@@ -10,7 +10,13 @@ export type SessionPayload = {
   organizationId: string | null;
   doctorId: string | null;
   expiresAt: Date;
+  lastActivity?: number; // unix ms — set/refreshed by middleware
 };
+
+// Absolute session lifetime: 8 hours
+export const SESSION_MAX_AGE_MS = 8 * 60 * 60 * 1000;
+// Inactivity window: 30 minutes
+export const SESSION_INACTIVITY_MS = 30 * 60 * 1000;
 
 function getEncodedKey() {
   const secret = process.env.SESSION_SECRET;
@@ -22,7 +28,7 @@ export async function encrypt(payload: SessionPayload) {
   return new SignJWT(payload as Record<string, unknown>)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime("7d")
+    .setExpirationTime("8h")
     .sign(getEncodedKey());
 }
 
@@ -46,8 +52,18 @@ export async function createSession(
   organizationId: string | null,
   doctorId: string | null
 ) {
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-  const session = await encrypt({ userId, email, name, role, organizationId, doctorId, expiresAt });
+  const now = Date.now();
+  const expiresAt = new Date(now + SESSION_MAX_AGE_MS);
+  const session = await encrypt({
+    userId,
+    email,
+    name,
+    role,
+    organizationId,
+    doctorId,
+    expiresAt,
+    lastActivity: now,
+  });
   const cookieStore = await cookies();
 
   cookieStore.set("session", session, {

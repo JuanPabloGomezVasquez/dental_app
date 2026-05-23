@@ -4,6 +4,7 @@ import { getAccessibleModules, assertModuleAccess, AppModule } from "@/lib/modul
 import { patientsService } from "@/lib/services/patients.service";
 import { updatePatientSchema } from "@/lib/validations/patient.schema";
 import { handleApiError } from "@/lib/errors";
+import { writeAuditLog, requestMeta } from "@/lib/audit";
 
 type Params = Promise<{ id: string }>;
 
@@ -43,6 +44,15 @@ export async function PUT(
 
   try {
     const patient = await patientsService.update(id, session.organizationId, parsed.data);
+    writeAuditLog({
+      userId: session.userId,
+      userEmail: session.email,
+      action: "PATIENT_UPDATED",
+      resource: "Patient",
+      resourceId: id,
+      organizationId: session.organizationId,
+      ...requestMeta(req),
+    });
     return Response.json(patient);
   } catch (error) {
     return handleApiError(error);

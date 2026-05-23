@@ -1,7 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Menu, X } from "lucide-react";
+import { logout } from "@/app/actions/auth";
+
+// Mirror of server constant (30 min) — client enforces before server kicks in
+const INACTIVITY_MS = 30 * 60 * 1000;
 
 interface DashboardShellProps {
   sidebar: React.ReactNode;
@@ -10,11 +15,36 @@ interface DashboardShellProps {
 
 export function DashboardShell({ sidebar, children }: DashboardShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const router = useRouter();
 
-  /* Close drawer on route change (when a link inside sidebar is clicked) */
+  /* Close drawer on route change */
   useEffect(() => {
     setSidebarOpen(false);
   }, []);
+
+  /* Client-side inactivity detector — logs out after 30 min of no interaction */
+  const handleInactivity = useCallback(async () => {
+    await logout();
+    router.push("/login");
+  }, [router]);
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+
+    const resetTimer = () => {
+      clearTimeout(timer);
+      timer = setTimeout(handleInactivity, INACTIVITY_MS);
+    };
+
+    const events = ["mousemove", "keydown", "pointerdown", "scroll", "touchstart"];
+    events.forEach((e) => window.addEventListener(e, resetTimer, { passive: true }));
+    resetTimer();
+
+    return () => {
+      clearTimeout(timer);
+      events.forEach((e) => window.removeEventListener(e, resetTimer));
+    };
+  }, [handleInactivity]);
 
   /* Prevent body scroll while mobile drawer is open */
   useEffect(() => {

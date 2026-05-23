@@ -5,6 +5,7 @@ import { getAccessibleModules, assertModuleAccess, AppModule } from "@/lib/modul
 import { clinicalHistoryService } from "@/lib/services/clinical-history.service";
 import { createNoteSchema } from "@/lib/validations/clinical-history.schema";
 import { handleApiError } from "@/lib/errors";
+import { writeAuditLog, requestMeta } from "@/lib/audit";
 
 type Params = Promise<{ id: string }>;
 
@@ -41,6 +42,15 @@ export async function POST(
     const note = await clinicalHistoryService.addNote(id, {
       ...parsed.data,
       doctorId: session.doctorId,
+    });
+    writeAuditLog({
+      userId: session.userId,
+      userEmail: session.email,
+      action: "CLINICAL_NOTE_CREATED",
+      resource: "ClinicalNote",
+      resourceId: note.id,
+      organizationId: session.organizationId,
+      ...requestMeta(req),
     });
     return Response.json(note, { status: 201 });
   } catch (error) {
@@ -100,6 +110,15 @@ export async function DELETE(
 
   try {
     await clinicalHistoryService.deleteNote(id, noteId, session.role, session.doctorId);
+    writeAuditLog({
+      userId: session.userId,
+      userEmail: session.email,
+      action: "CLINICAL_NOTE_DELETED",
+      resource: "ClinicalNote",
+      resourceId: noteId,
+      organizationId: session.organizationId,
+      ...requestMeta(req),
+    });
     return new Response(null, { status: 204 });
   } catch (error) {
     return handleApiError(error);

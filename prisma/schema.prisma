@@ -68,6 +68,8 @@ model User {
   role                UserRole             @default(ADMIN)
   active              Boolean              @default(true)
   organizationId      String?
+  totpSecret          String?
+  totpEnabled         Boolean              @default(false)
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
   organization        Organization?        @relation(fields: [organizationId], references: [id])
@@ -317,4 +319,38 @@ enum PaymentMethod {
   TRANSFERENCIA
   TARJETA_DEBITO
   TARJETA_CREDITO
+}
+
+// ── Audit Logging ──────────────────────────────────────────
+
+enum AuditAction {
+  LOGIN
+  LOGOUT
+  LOGIN_FAILED
+  PATIENT_VIEWED
+  PATIENT_CREATED
+  PATIENT_UPDATED
+  PATIENT_ANONYMIZED
+  PATIENT_EXPORTED
+  CLINICAL_NOTE_CREATED
+  CLINICAL_NOTE_DELETED
+  FILE_UPLOADED
+  FILE_DELETED
+}
+
+model AuditLog {
+  id             String      @id @default(cuid())
+  userId         String
+  userEmail      String
+  action         AuditAction
+  resource       String?
+  resourceId     String?
+  organizationId String?
+  ipAddress      String?
+  userAgent      String?
+  createdAt      DateTime    @default(now())
+
+  @@index([userId])
+  @@index([organizationId, createdAt])
+  @@index([action, createdAt])
 }

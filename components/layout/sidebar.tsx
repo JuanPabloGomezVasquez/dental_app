@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Settings, LogOut } from "lucide-react";
+import { Settings, LogOut, ShieldCheck } from "lucide-react";
 import { logout } from "@/app/actions/auth";
 import {
   AppModule,
@@ -79,6 +79,10 @@ export default function Sidebar({
             </NavLink>
           );
         })}
+
+        <NavLink href="/security" label="Seguridad" pathname={pathname}>
+          <ShieldCheck size={18} className="flex-shrink-0" />
+        </NavLink>
 
         {isAdmin && (
           <NavLink href="/admin" label="Administración" pathname={pathname}>

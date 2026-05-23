@@ -4,6 +4,7 @@ import { verifySession } from "@/lib/dal";
 import { getAccessibleModules, assertModuleAccess, AppModule } from "@/lib/modules";
 import { clinicalHistoryService } from "@/lib/services/clinical-history.service";
 import { handleApiError } from "@/lib/errors";
+import { writeAuditLog, requestMeta } from "@/lib/audit";
 
 type Params = Promise<{ id: string }>;
 
@@ -46,6 +47,15 @@ export async function POST(
       url: blob.url,
       mimeType: file.type,
     });
+    writeAuditLog({
+      userId: session.userId,
+      userEmail: session.email,
+      action: "FILE_UPLOADED",
+      resource: "PatientFile",
+      resourceId: patientFile.id,
+      organizationId: session.organizationId,
+      ...requestMeta(req),
+    });
     return Response.json(patientFile, { status: 201 });
   } catch (error) {
     return handleApiError(error);
@@ -68,6 +78,15 @@ export async function DELETE(
 
   try {
     await clinicalHistoryService.deleteFile(id, fileId);
+    writeAuditLog({
+      userId: session.userId,
+      userEmail: session.email,
+      action: "FILE_DELETED",
+      resource: "PatientFile",
+      resourceId: fileId,
+      organizationId: session.organizationId,
+      ...requestMeta(req),
+    });
     return new Response(null, { status: 204 });
   } catch (error) {
     return handleApiError(error);

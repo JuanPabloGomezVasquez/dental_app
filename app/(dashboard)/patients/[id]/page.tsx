@@ -8,6 +8,7 @@ import { HabeaDataWarning } from "@/components/patients/habeas-data-warning";
 import { PatientDetailClient } from "@/components/patients/patient-detail-client";
 import { PatientPrivacyActions } from "@/components/patients/patient-privacy-actions";
 import { NotFoundError } from "@/lib/errors";
+import { writeAuditLog } from "@/lib/audit";
 
 interface PatientDetailPageProps {
   params: Promise<{ id: string }>;
@@ -23,8 +24,18 @@ export default async function PatientDetailPage({ params }: PatientDetailPagePro
   let patient;
   let history;
   try {
-    patient = await patientsService.get(id, session.organizationId);
-    history = await clinicalHistoryService.getByPatientId(id);
+    [patient, history] = await Promise.all([
+      patientsService.get(id, session.organizationId),
+      clinicalHistoryService.getByPatientId(id),
+    ]);
+    writeAuditLog({
+      userId: session.userId,
+      userEmail: session.email,
+      action: "PATIENT_VIEWED",
+      resource: "Patient",
+      resourceId: id,
+      organizationId: session.organizationId,
+    });
   } catch (error) {
     if (error instanceof NotFoundError) notFound();
     throw error;

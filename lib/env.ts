@@ -8,6 +8,10 @@ if (
     "WHATSAPP_TEMPLATE_NAME",
     "INNGEST_EVENT_KEY",
     "INNGEST_SIGNING_KEY",
+    "R2_ACCOUNT_ID",
+    "R2_ACCESS_KEY_ID",
+    "R2_SECRET_ACCESS_KEY",
+    "R2_BUCKET_NAME",
   ];
   for (const key of optional) {
     if (!process.env[key]) {
