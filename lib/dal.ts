@@ -77,3 +77,14 @@ export function assertAdmin(role: "ADMIN" | "DOCTOR"): void {
 export async function getSession() {
   return getDecryptedSession();
 }
+
+/**
+ * Accepts any authenticated session (ADMIN, DOCTOR, or SUPER_ADMIN).
+ * Use this for operations that are user-scoped but not role-restricted,
+ * such as the user's own TOTP/security settings.
+ */
+export const verifyAuthenticated = cache(async (): Promise<{ userId: string }> => {
+  const session = await getDecryptedSession();
+  if (!session?.userId) redirect("/login");
+  return { userId: session.userId };
+});

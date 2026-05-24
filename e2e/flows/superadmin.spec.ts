@@ -6,6 +6,8 @@
  * - Org detail: module toggle persists state
  * - Suspend / activate organization
  * - Clinic admin cannot access /superadmin routes
+ * - /superadmin/audit-logs renders the logs table with filter controls
+ * - /superadmin/security renders 2FA settings
  *
  * These tests use a fresh browser context (no pre-saved admin session).
  */
@@ -24,6 +26,11 @@ const SUPER_ADMIN_PASSWORD = "superadmin123";
 let testOrgId: string | null = null;
 
 async function loginAsSuperAdmin(page: import("@playwright/test").Page) {
+  // Clear 2FA so automated login is never blocked by the TOTP step
+  await db.user.updateMany({
+    where: { email: SUPER_ADMIN_EMAIL },
+    data: { totpEnabled: false, totpSecret: null },
+  });
   await page.goto("/login");
   await page.getByLabel("Email").fill(SUPER_ADMIN_EMAIL);
   await page.getByLabel("Contraseña").fill(SUPER_ADMIN_PASSWORD);
@@ -231,4 +238,91 @@ test("user from suspended organization cannot log in", async ({ page }) => {
     await db.user.delete({ where: { id: user.id } }).catch(() => undefined);
     await db.organization.delete({ where: { id: org.id } }).catch(() => undefined);
   }
+});
+
+// ─── Audit logs ───────────────────────────────────────────────────────────────
+
+test("super admin can navigate to audit logs and see the table", async ({ page }) => {
+  await loginAsSuperAdmin(page);
+
+  await page.getByRole("link", { name: /logs de auditoría/i }).click();
+  await page.waitForURL("**/superadmin/audit-logs", { timeout: 8000 });
+
+  await expect(
+    page.getByRole("heading", { name: /logs de auditoría/i })
+  ).toBeVisible({ timeout: 5000 });
+
+  // Filter controls must be present
+  await expect(page.locator('select[name="action"]')).toBeVisible();
+  await expect(page.locator('select[name="organizationId"]')).toBeVisible();
+  await expect(page.locator('input[type="date"][name="from"]')).toBeVisible();
+
+  // Table or empty-state must render (login events were created during test setup)
+  const table = page.locator("table");
+  const emptyState = page.getByText(/sin resultados|no hay registros/i);
+  await expect(table.or(emptyState)).toBeVisible({ timeout: 5000 });
+});
+
+test("audit logs filter by action shows only matching rows", async ({ page }) => {
+  await loginAsSuperAdmin(page);
+  await page.goto("/superadmin/audit-logs?action=LOGIN");
+
+  // Every visible action badge should say "Inicio de sesión"
+  const badges = page.locator("table tbody td").filter({ hasText: /inicio de sesión/i });
+  const count = await badges.count();
+
+  // If there are rows, they must all be LOGIN; if no rows, empty state is acceptable
+  if (count > 0) {
+    // All badges in the table should be LOGIN (no other actions visible)
+    const allBadges = await page.locator("table tbody tr td:nth-child(3) span").allTextContents();
+    for (const badge of allBadges) {
+      expect(badge).toMatch(/inicio de sesión/i);
+    }
+  } else {
+    await expect(page.getByText(/sin resultados|no hay registros/i)).toBeVisible();
+  }
+});
+
+// ─── Security / 2FA settings ──────────────────────────────────────────────────
+
+test("super admin can navigate to security settings", async ({ page }) => {
+  await loginAsSuperAdmin(page);
+
+  await page.getByRole("link", { name: /seguridad/i }).click();
+  await page.waitForURL("**/superadmin/security", { timeout: 8000 });
+
+  await expect(
+    page.getByRole("heading", { name: /seguridad/i })
+  ).toBeVisible({ timeout: 5000 });
+
+  await expect(
+    page.getByText(/autenticación de dos factores/i).first()
+  ).toBeVisible();
+});
+
+test("super admin security page shows 2FA status and allows setup", async ({ page }) => {
+  await loginAsSuperAdmin(page);
+  await page.goto("/superadmin/security");
+
+  // Either the configure button (2FA off) or the status label (2FA on) must be visible
+  const configureBtn = page.getByRole("button", { name: /configurar 2fa/i });
+  const statusText = page.getByText(/2fa habilitado/i);
+  await expect(configureBtn.or(statusText)).toBeVisible({ timeout: 5000 });
+});
+
+test("super admin can start 2FA setup and QR code appears", async ({ page }) => {
+  await loginAsSuperAdmin(page);
+  await page.goto("/superadmin/security");
+
+  const setupBtn = page.getByRole("button", { name: /configurar 2fa/i });
+  const isPresent = await setupBtn.isVisible().catch(() => false);
+  if (!isPresent) {
+    test.skip();
+    return;
+  }
+
+  await setupBtn.click();
+
+  // QR code data-URL image should appear
+  await expect(page.locator("img[src^='data:image']")).toBeVisible({ timeout: 10000 });
 });

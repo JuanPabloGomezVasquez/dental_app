@@ -1,6 +1,7 @@
 import { Toaster } from "sonner";
 import { verifySuperAdmin } from "@/lib/dal";
 import { logout } from "@/app/actions/auth";
+import { SuperAdminNav } from "@/components/superadmin/superadmin-nav";
 import { ShieldCheck, LogOut } from "lucide-react";
 
 export default async function SuperAdminLayout({ children }: { children: React.ReactNode }) {
@@ -10,14 +11,17 @@ export default async function SuperAdminLayout({ children }: { children: React.R
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-7 h-7 rounded-lg bg-purple-600 flex items-center justify-center flex-shrink-0">
-              <ShieldCheck size={14} className="text-white" />
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3 flex-shrink-0">
+              <div className="w-7 h-7 rounded-lg bg-purple-600 flex items-center justify-center">
+                <ShieldCheck size={14} className="text-white" />
+              </div>
+              <span className="text-sm font-semibold text-gray-900">DentApp</span>
+              <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">
+                Super Admin
+              </span>
             </div>
-            <span className="text-sm font-semibold text-gray-900">DentApp</span>
-            <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">
-              Super Admin
-            </span>
+            <SuperAdminNav />
           </div>
           <div className="flex items-center gap-4">
             <span className="text-sm text-gray-500">{session.name}</span>

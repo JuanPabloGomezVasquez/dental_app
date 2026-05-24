@@ -1,10 +1,10 @@
 import bcrypt from "bcryptjs";
-import { verifySession } from "@/lib/dal";
+import { verifyAuthenticated } from "@/lib/dal";
 import { db } from "@/lib/db";
 import { totpService } from "@/lib/services/totp.service";
 
 export async function DELETE(req: Request): Promise<Response> {
-  const session = await verifySession();
+  const session = await verifyAuthenticated();
 
   const body = await req.json() as { token?: unknown; password?: unknown };
   const token = body?.token;

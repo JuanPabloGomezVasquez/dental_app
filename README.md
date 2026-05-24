@@ -93,12 +93,15 @@ Key conventions:
 
 ### Super Admin Panel
 
-The platform owner (role `SUPER_ADMIN`) manages all clinics from `/superadmin/organizations`. The panel lets the owner:
-- Create new organizations (atomically creates org + admin user + all 5 OrgModule rows in one transaction)
-- Suspend or reactivate organizations (suspended org users cannot log in)
-- Toggle which AppModules a clinic has contracted (cascades: disabling a module also revokes all DoctorModulePermissions for that module)
+The platform owner (role `SUPER_ADMIN`) manages all clinics from the `/superadmin` panel. Navigation bar links:
 
-`SUPER_ADMIN` users have `organizationId = null`. `verifySession()` blocks them from the clinic dashboard; `verifySuperAdmin()` blocks everyone else from the super admin panel.
+| Route | Purpose |
+|---|---|
+| `/superadmin/organizations` | Create / suspend / configure module access per clinic |
+| `/superadmin/audit-logs` | Cross-org audit log viewer with filters (action, org, date range) and pagination |
+| `/superadmin/security` | 2FA (TOTP) settings for the superadmin's own account |
+
+`SUPER_ADMIN` users have `organizationId = null`. `verifySession()` blocks them from the clinic dashboard; `verifySuperAdmin()` blocks everyone else from the super admin panel. TOTP API routes use `verifyAuthenticated()` (any role) so the superadmin can manage their own 2FA.
 
 ### Multi-tenancy & Module Gating
 
@@ -306,7 +309,7 @@ npx playwright test --ui
 - `e2e/flows/` — full user flows (patient creation, appointment scheduling, payment cycle)
 - `e2e/flows/module-gating.spec.ts` — sidebar shows/hides modules; direct URL to disabled module → 403
 - `e2e/flows/doctor-login.spec.ts` — doctor with modules → redirected; no modules → `/no-access`
-- `e2e/flows/superadmin.spec.ts` — super admin login, org creation, module toggles, org suspension, suspended-org login block
+- `e2e/flows/superadmin.spec.ts` — super admin login, org creation, module toggles, org suspension, suspended-org login block; audit-logs page (table + filters); security page (2FA setup)
 - `e2e/a11y/` — WCAG 2.1 A/AA accessibility audit on all main routes
 - `e2e/ux/` — Spanish error messages, responsive layout on tablet
 

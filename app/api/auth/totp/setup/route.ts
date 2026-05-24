@@ -1,9 +1,9 @@
-import { verifySession } from "@/lib/dal";
+import { verifyAuthenticated } from "@/lib/dal";
 import { db } from "@/lib/db";
 import { totpService } from "@/lib/services/totp.service";
 
 export async function GET(): Promise<Response> {
-  const session = await verifySession();
+  const session = await verifyAuthenticated();
 
   const user = await db.user.findUnique({ where: { id: session.userId } });
   if (!user) return Response.json({ error: "Usuario no encontrado" }, { status: 404 });

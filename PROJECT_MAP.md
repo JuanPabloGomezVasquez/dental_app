@@ -101,7 +101,7 @@ Old sessions missing `organizationId` → `verifySession()` redirects to `/login
 
 ## Super Admin Panel
 
-**Route group:** `app/(superadmin)/` — isolated layout, `verifySuperAdmin()` only, no shared code with dashboard
+**Route group:** `app/(superadmin)/` — isolated layout with nav bar (`components/superadmin/superadmin-nav.tsx`), `verifySuperAdmin()` only, no shared code with dashboard
 
 **Routes:**
 | Route | Handler |
@@ -109,16 +109,26 @@ Old sessions missing `organizationId` → `verifySession()` redirects to `/login
 | `GET /superadmin/organizations` | `app/(superadmin)/superadmin/organizations/page.tsx` — org list |
 | `GET /superadmin/organizations/new` | `app/(superadmin)/superadmin/organizations/new/page.tsx` — create form |
 | `GET /superadmin/organizations/[id]` | `app/(superadmin)/superadmin/organizations/[id]/page.tsx` — detail |
+| `GET /superadmin/audit-logs` | `app/(superadmin)/superadmin/audit-logs/page.tsx` — audit log viewer with filters, pagination, org name resolution |
+| `GET /superadmin/security` | `app/(superadmin)/superadmin/security/page.tsx` — 2FA settings for the superadmin account |
 | `GET /api/superadmin/organizations` | List all orgs with counts and enabled modules |
 | `POST /api/superadmin/organizations` | Create org (validates slug + email uniqueness, atomic tx) |
 | `GET /api/superadmin/organizations/[id]` | Org detail with all 5 modules |
 | `PUT /api/superadmin/organizations/[id]` | Update name or active status |
 | `PUT /api/superadmin/organizations/[id]/modules` | Toggle a module on/off (cascade disable to doctor perms) |
 
+**Audit log viewer (`/superadmin/audit-logs`):**
+- Server-rendered page — reads `searchParams` (action, organizationId, from, to, page), calls `auditRepository.findMany()` directly
+- Filters: action dropdown (all 12 `AuditAction` values), org dropdown (all orgs), date range (from/to)
+- Table: timestamp | email | action badge (color-coded) | resource | org name | IP
+- Pagination: prev/next links that preserve active filters in URL query string
+- Page size: 25 rows
+
 **Client components (`components/superadmin/`):**
 - `org-list-client.tsx` — org table with active badge, user/doctor/patient counts, module chips
 - `org-form.tsx` — create form; POST to API, toast + redirect on success
 - `org-detail-client.tsx` — module toggle switches (optimistic + rollback) + suspend/activate button
+- `superadmin-nav.tsx` — client nav with `usePathname()` active-link highlighting; links to organizations, audit-logs, security
 
 **Service (`lib/services/superadmin.service.ts`):**
 - `listOrganizations()` — DTOs with counts and `enabledModules[]`
@@ -145,7 +155,7 @@ Old sessions missing `organizationId` → `verifySession()` redirects to `/login
 | `lib/session.ts` | `encrypt()` / `decrypt()` JWT with Jose HS256 8h; `createSession(payload)` includes `lastActivity` unix ms for inactivity tracking |
 | `lib/session-edge.ts` | Edge-safe (`encryptEdge` / `decryptEdge`) — used only by `proxy.ts` |
 | `proxy.ts` | Replaces `middleware.ts`. Runs on every request (except static/image/favicon). Checks `lastActivity` (30 min inactivity limit) and absolute session age (8 h). On valid session: re-signs JWT with updated `lastActivity` (sliding window). Exempts `/api/auth/**` and `/api/inngest` from auth redirect. |
-| `lib/dal.ts` | `verifySession()` — reads cookie, verifies JWT, redirects to `/login` if missing `organizationId` or role is `SUPER_ADMIN`; `assertAdmin()` — throws ForbiddenError if role ≠ ADMIN; `getSession()` — non-throwing reader used by logout audit |
+| `lib/dal.ts` | `verifySession()` — reads cookie, verifies JWT, redirects to `/login` if missing `organizationId` or role is `SUPER_ADMIN`; `verifySuperAdmin()` — redirects if role ≠ `SUPER_ADMIN`; `verifyAuthenticated()` — accepts any authenticated role (used by TOTP routes so SUPER_ADMIN can also manage their 2FA); `assertAdmin()` — throws ForbiddenError if role ≠ ADMIN; `getSession()` — non-throwing reader used by logout audit |
 | `app/(auth)/login/login-form.tsx` | `useActionState(login)` / `useActionState(verify2fa)`. When `state.requires2fa === true` shows TOTP input step (6-digit, digit-only, monospace). |
 | `app/(dashboard)/layout.tsx` | Calls `verifySession()` + `getAccessibleModules()` + `getLowStockCount()` → renders `<Sidebar enabledModules isAdmin>` |
 
@@ -168,14 +178,20 @@ Old sessions missing `organizationId` → `verifySession()` redirects to `/login
 | File | Role |
 |---|---|
 | `lib/audit.ts` | `writeAuditLog(params)` — fire-and-forget, never throws. `requestMeta(req)` extracts IP + UA from HTTP request. `serverActionMeta()` extracts IP + UA from `next/headers` (server actions). |
-| `lib/repositories/audit.repository.ts` | `auditRepository.create()` — thin wrapper around `db.auditLog.create()`. |
+| `lib/repositories/audit.repository.ts` | `auditRepository.create()` — write. `auditRepository.findMany(params)` — read with filters (action, organizationId, date range) and offset pagination. |
 | `prisma/schema.prisma` | `AuditLog` model + `AuditAction` enum. |
+
+**Reading audit logs:** `/superadmin/audit-logs` — superadmin-only page with filter form (GET-based, full server render) and paginated table. Clinic admins cannot access; their audit data is visible per-org to the superadmin via the org filter.
 
 **Key invariant:** `writeAuditLog` uses `.catch(() => {})` — a DB failure writing an audit log must NEVER propagate to the caller.
 
 ### Two-Factor Authentication (TOTP)
 
-**UI route:** `/security` — shows 2FA status; all roles can access it.
+**UI routes:**
+- `/security` — dashboard users (ADMIN, DOCTOR) manage their 2FA
+- `/superadmin/security` — SUPER_ADMIN manages their 2FA (same `SecurityPageClient` component, guarded by `verifySuperAdmin()`)
+
+**TOTP API routes accept all authenticated roles** via `verifyAuthenticated()` (replaced `verifySession()`) so the superadmin's setup/enable/disable API calls are not rejected.
 
 **API routes:**
 | Route | Method | What it does |
@@ -442,7 +458,7 @@ Old sessions missing `organizationId` → `verifySession()` redirects to `/login
 | `lib/db.ts` | PrismaClient singleton (hot-reload safe) |
 | `lib/session.ts` | JWT HS256 — `createSession()`, `deleteSession()`, `encrypt()`, `decrypt()`, `SESSION_INACTIVITY_MS`, `SESSION_MAX_AGE_MS` |
 | `lib/session-edge.ts` | Edge-safe JWT helpers — `encryptEdge()`, `decryptEdge()` — used only by `proxy.ts` |
-| `lib/dal.ts` | `verifySession()` → `DashboardSessionUser`; `verifySuperAdmin()` → `SuperAdminSessionUser`; `assertAdmin()`; `getSession()` (non-throwing) |
+| `lib/dal.ts` | `verifySession()` → `DashboardSessionUser`; `verifySuperAdmin()` → `SuperAdminSessionUser`; `verifyAuthenticated()` → `{ userId }` (any role — used by TOTP routes); `assertAdmin()`; `getSession()` (non-throwing) |
 | `lib/crypto.ts` | AES-256-GCM field encryption — `encrypt()`, `decrypt()`, `encryptOptional()`, `decryptOptional()`. Key: `FIELD_ENCRYPTION_KEY` (64 hex chars) |
 | `lib/audit.ts` | Fire-and-forget audit log writer + `requestMeta()` + `serverActionMeta()` |
 | `lib/errors.ts` | `AppError`, `ValidationError`, `NotFoundError`, `ConflictError`, `ForbiddenError`, `handleApiError()` |
@@ -521,6 +537,7 @@ InventoryCategory → InventoryItem → StockLog[]   (all with organizationId)
 | `tests/unit/services/patients.service.test.ts` | DOCTOR fetches patientIds from appointments first; ADMIN does not; correct pagination (pages = ceil(total/pageSize)) |
 | `tests/unit/services/superadmin.service.test.ts` | `listOrganizations` maps counts + enabledModules; `getOrgDetail` fills all modules; `createOrganization` checks slug+email uniqueness, creates all 5 OrgModule rows; `updateOrganization` guards NotFoundError; `setOrgModule` cascades disable to doctor perms |
 | `tests/unit/services/totp.service.test.ts` | `generateSecret` / `getOtpauthUrl` / `getQrDataUrl`; `verifyToken` correct/incorrect/rejects-gracefully, checks 3 time steps (±30s drift), short-circuits on first match, uses epoch in seconds; `encryptSecret`/`decryptSecret` round-trip |
+| `tests/unit/repositories/audit.repository.test.ts` | `create` delegates to `db.auditLog.create`; `findMany` — no-filter returns all; action/organizationId/from/to filters applied to `where`; combined filters; skip=(page-1)×pageSize calculation for pages 1/2/3; always orders by `createdAt desc`; returns logs+total from parallel queries |
 
 **Mock contract:** Prisma queries filter with `where: { enabled: true }` — mocks must only return enabled=true rows to accurately simulate DB behavior.
 
@@ -538,7 +555,7 @@ InventoryCategory → InventoryItem → StockLog[]   (all with organizationId)
 - `e2e/flows/payment.spec.ts` — creates billing record + full payment cycle
 - `e2e/flows/module-gating.spec.ts` — sidebar shows/hides Caja link when module toggled; direct URL to disabled module → 403; admin panel always accessible; afterAll re-enables CAJA
 - `e2e/flows/doctor-login.spec.ts` — `test.use({ storageState: { cookies: [], origins: [] } })` (no admin session); creates Doctor + User via Prisma; doctor with no modules → `/no-access`; doctor with APPOINTMENTS → `/appointments`
-- `e2e/flows/superadmin.spec.ts` — super admin login → `/superadmin/organizations`; clinic admin blocked from superadmin routes; org creation (slug + admin user); module toggle persists in DB; org suspension/activation; suspended org blocks user login
+- `e2e/flows/superadmin.spec.ts` — super admin login → `/superadmin/organizations`; clinic admin blocked from superadmin routes; org creation (slug + admin user); module toggle persists in DB; org suspension/activation; suspended org blocks user login; nav to `/superadmin/audit-logs` (table + filter controls visible); action filter shows only matching rows; nav to `/superadmin/security` (2FA settings visible); setup button triggers QR image
 - `e2e/flows/security.spec.ts` — "Seguridad" link visible in sidebar; `/security` page renders; 2FA status shown; clicking setup shows QR image. Full 2FA login flow (requires live TOTP code) is covered by unit tests + manual QA.
 - `e2e/a11y/accessibility.spec.ts` — axe-playwright, WCAG 2.1 A/AA, critical/serious impacts only
 - `e2e/ux/error-messages.spec.ts` — Spanish error messages, duplicate ID number
