@@ -1,7 +1,6 @@
 import type { Patient } from "@prisma/client";
 import { randomBytes } from "crypto";
 import { patientsRepository } from "@/lib/repositories/patients.repository";
-import { appointmentsRepository } from "@/lib/repositories/appointments.repository";
 import type { CreatePatientInput, UpdatePatientInput } from "@/lib/validations/patient.schema";
 import { NotFoundError, ConflictError } from "@/lib/errors";
 import { encrypt, decrypt, encryptOptional, decryptOptional } from "@/lib/crypto";
@@ -40,8 +39,6 @@ export type PatientExport = {
 interface PatientsService {
   list(options?: {
     organizationId: string;
-    callerRole: "ADMIN" | "DOCTOR";
-    callerDoctorId: string | null;
     search?: string;
     page?: number;
     pageSize?: number;
@@ -70,27 +67,16 @@ function decryptPatient(patient: Patient): Patient {
 }
 
 const service: PatientsService = {
-  async list({ organizationId, callerRole, callerDoctorId, search, page = 1, pageSize = 20 } = {
+  async list({ organizationId, search, page = 1, pageSize = 20 } = {
     organizationId: "",
-    callerRole: "ADMIN",
-    callerDoctorId: null,
   }) {
     const skip = (page - 1) * pageSize;
-
-    let doctorPatientIds: string[] | undefined;
-    if (callerRole === "DOCTOR" && callerDoctorId) {
-      doctorPatientIds = await appointmentsRepository.findPatientIdsByDoctor(
-        callerDoctorId,
-        organizationId
-      );
-    }
 
     const { patients, total } = await patientsRepository.findAll({
       organizationId,
       search: search || undefined,
       skip,
       take: pageSize,
-      doctorPatientIds,
     });
     const pages = Math.ceil(total / pageSize) || 1;
     return { patients: patients.map(decryptPatient), total, page, pages, pageSize };

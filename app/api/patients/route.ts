@@ -18,8 +18,6 @@ export async function GET(request: NextRequest): Promise<Response> {
 
   const result = await patientsService.list({
     organizationId: session.organizationId,
-    callerRole: session.role,
-    callerDoctorId: session.doctorId,
     search,
     page,
     pageSize,

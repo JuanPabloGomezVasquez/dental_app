@@ -50,7 +50,6 @@ interface PatientsRepository {
     search?: string;
     skip?: number;
     take?: number;
-    doctorPatientIds?: string[];
   }): Promise<PatientListResult>;
   findById(id: string, organizationId: string): Promise<Patient | null>;
   findByIdNumber(idNumber: string, organizationId: string): Promise<Patient | null>;
@@ -62,10 +61,9 @@ interface PatientsRepository {
 }
 
 const repo: PatientsRepository = {
-  async findAll({ organizationId, search, skip = 0, take = 20, doctorPatientIds } = { organizationId: "" }) {
+  async findAll({ organizationId, search, skip = 0, take = 20 } = { organizationId: "" }) {
     const where: Prisma.PatientWhereInput = {
       organizationId,
-      ...(doctorPatientIds !== undefined ? { id: { in: doctorPatientIds } } : {}),
       ...(search
         ? {
             OR: [
