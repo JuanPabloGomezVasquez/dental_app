@@ -19,11 +19,16 @@ function getWeekRange(): { start: Date; end: Date } {
   return { start: weekStart, end: weekEnd }
 }
 
-export default async function AppointmentsPage() {
+interface AppointmentsPageProps {
+  searchParams: Promise<{ new?: string }>
+}
+
+export default async function AppointmentsPage({ searchParams }: AppointmentsPageProps) {
   const session = await verifySession()
   const accessible = await getAccessibleModules(session.organizationId, session.role, session.doctorId)
   requireModuleAccess(accessible, AppModule.APPOINTMENTS)
 
+  const params = await searchParams
   const { start, end } = getWeekRange()
   const appointments = await appointmentsService.listByDateRange(
     start,
@@ -38,6 +43,7 @@ export default async function AppointmentsPage() {
       <AppointmentsPageClient
         initialAppointments={appointments}
         initialRange={{ start: start.toISOString(), end: end.toISOString() }}
+        openNew={params.new === "1"}
       />
     </div>
   )

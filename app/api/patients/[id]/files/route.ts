@@ -39,8 +39,19 @@ export async function POST(
     );
   }
 
+  let blob: Awaited<ReturnType<typeof put>>;
   try {
-    const blob = await put(file.name, file, { access: "public" });
+    blob = await put(file.name, file, { access: "public" });
+  } catch (blobError) {
+    const msg = blobError instanceof Error ? blobError.message : String(blobError);
+    console.error("[files/route] Vercel Blob put() error:", msg);
+    if (msg.includes("BLOB_READ_WRITE_TOKEN") || msg.includes("token")) {
+      return Response.json({ error: "El almacenamiento de archivos no está configurado correctamente (token)." }, { status: 500 });
+    }
+    return Response.json({ error: `Error al subir el archivo: ${msg}` }, { status: 500 });
+  }
+
+  try {
     const patientFile = await clinicalHistoryService.addFile(id, {
       name: file.name,
       label: typeof label === "string" && label.trim() ? label.trim() : undefined,

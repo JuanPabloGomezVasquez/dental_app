@@ -4,7 +4,7 @@ import { patientsService } from "@/lib/services/patients.service";
 import { PatientsPageClient } from "@/components/patients/patients-page-client";
 
 interface PatientsPageProps {
-  searchParams: Promise<{ search?: string; page?: string }>;
+  searchParams: Promise<{ search?: string; page?: string; new?: string }>;
 }
 
 export default async function PatientsPage({ searchParams }: PatientsPageProps) {
@@ -22,6 +22,6 @@ export default async function PatientsPage({ searchParams }: PatientsPageProps) 
     search,
     page,
   });
-  return <PatientsPageClient data={data} search={search} />;
+  return <PatientsPageClient data={data} search={search} openNew={params.new === "1"} />;
 }
 

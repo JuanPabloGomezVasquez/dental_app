@@ -6,7 +6,6 @@ import { patientsService } from "@/lib/services/patients.service";
 import { clinicalHistoryService } from "@/lib/services/clinical-history.service";
 import { HabeaDataWarning } from "@/components/patients/habeas-data-warning";
 import { PatientDetailClient } from "@/components/patients/patient-detail-client";
-import { PatientPrivacyActions } from "@/components/patients/patient-privacy-actions";
 import { NotFoundError } from "@/lib/errors";
 import { writeAuditLog } from "@/lib/audit";
 
@@ -68,10 +67,6 @@ export default async function PatientDetailPage({ params }: PatientDetailPagePro
         currentRole={session.role}
       />
 
-      <PatientPrivacyActions
-        patientId={patient.id}
-        patientName={`${patient.firstName} ${patient.lastName}`}
-      />
     </div>
   );
 }

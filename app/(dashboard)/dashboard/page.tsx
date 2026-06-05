@@ -1,5 +1,6 @@
 import { verifySession } from "@/lib/dal";
 import { getAccessibleModules, AppModule } from "@/lib/modules";
+import { AppointmentStatus } from "@prisma/client";
 import { appointmentsService } from "@/lib/services/appointments.service";
 import { inventoryService } from "@/lib/services/inventory.service";
 import { cajaService } from "@/lib/services/caja.service";
@@ -80,7 +81,7 @@ export default async function DashboardPage() {
   const { start, end, now } = getBogotaTodayRange();
 
   /* Parallel data fetch — only request what's accessible */
-  const [appointmentsToday, lowStock, pendingCaja] = await Promise.all([
+  const [appointmentsToday, lowStock, todayIncome] = await Promise.all([
     hasAppointments
       ? appointmentsService.listByDateRange(
           start,
@@ -94,22 +95,22 @@ export default async function DashboardPage() {
       ? inventoryService.getLowStockAlerts(session.organizationId)
       : Promise.resolve(null),
     hasCaja
-      ? cajaService.list({
-          organizationId: session.organizationId,
-          status: "PENDIENTE",
-          pageSize: 10,
-        })
+      ? cajaService.getTodayIncome(session.organizationId, start, end)
       : Promise.resolve(null),
   ]);
 
   /* Derived stats */
-  const nowMs = now.getTime();
   const completedToday = appointmentsToday.filter(
-    (apt) => new Date(apt.date).getTime() < nowMs
+    (apt) =>
+      apt.status === AppointmentStatus.TERMINADA ||
+      apt.status === AppointmentStatus.NO_ASISTIO
   ).length;
   const upcomingToday = appointmentsToday.length - completedToday;
   const nextAppt = appointmentsToday.find(
-    (apt) => new Date(apt.date).getTime() >= nowMs
+    (apt) =>
+      apt.status === AppointmentStatus.CONFIRMADA ||
+      apt.status === AppointmentStatus.EN_SALA ||
+      apt.status === AppointmentStatus.EN_CONSULTA
   );
 
   const lowStockMapped = lowStock
@@ -122,29 +123,16 @@ export default async function DashboardPage() {
       }))
     : null;
 
-  const pendingPaymentsMapped = pendingCaja
-    ? pendingCaja.records.map((r) => ({
-        id: r.id,
-        patientName: `${r.patient.firstName} ${r.patient.lastName}`,
-        balance: Number(r.balance),
-        description: r.description,
-      }))
-    : null;
-
-  const pendingTotal = pendingPaymentsMapped
-    ? pendingPaymentsMapped.reduce((sum, p) => sum + p.balance, 0)
-    : 0;
-
   /* Quick actions — only show what user has access to */
   const quickActions = [
     hasAppointments && {
       label: "Nueva cita",
-      href: "/appointments",
+      href: "/appointments?new=1",
       icon: CalendarPlus,
     },
     hasPatients && {
       label: "Nuevo paciente",
-      href: "/patients",
+      href: "/patients?new=1",
       icon: UserPlus,
     },
   ].filter(Boolean) as { label: string; href: string; icon: typeof CalendarPlus }[];
@@ -153,7 +141,7 @@ export default async function DashboardPage() {
     style: "currency",
     currency: "COP",
     maximumFractionDigits: 0,
-    notation: pendingTotal >= 1_000_000 ? "compact" : "standard",
+    notation: (todayIncome ?? 0) >= 1_000_000 ? "compact" : "standard",
   });
 
   return (
@@ -175,7 +163,13 @@ export default async function DashboardPage() {
             value={nextAppt ? formatTimeBogota(nextAppt.date) : "—"}
             subtitle={
               nextAppt
-                ? `${nextAppt.patient.firstName} ${nextAppt.patient.lastName}`
+                ? [
+                    `${nextAppt.patient.firstName} ${nextAppt.patient.lastName}`,
+                    nextAppt.procedure.name,
+                    session.role === "ADMIN" ? nextAppt.doctor.name : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")
                 : "Sin más citas hoy"
             }
             accent="blue"
@@ -198,21 +192,13 @@ export default async function DashboardPage() {
           />
         )}
 
-        {hasCaja && pendingPaymentsMapped && (
+        {hasCaja && todayIncome !== null && (
           <KpiCard
             icon={DollarSign}
-            label="Pagos pendientes"
-            value={
-              pendingTotal > 0 ? COP.format(pendingTotal) : "$0"
-            }
-            subtitle={
-              pendingPaymentsMapped.length > 0
-                ? `${pendingPaymentsMapped.length} ${
-                    pendingPaymentsMapped.length === 1 ? "cuenta" : "cuentas"
-                  } por cobrar`
-                : "Todo al día"
-            }
-            accent="amber"
+            label="Ingresos hoy"
+            value={todayIncome > 0 ? COP.format(todayIncome) : "$0"}
+            subtitle={todayIncome > 0 ? "Recaudado en el día" : "Sin pagos registrados hoy"}
+            accent="green"
             href="/caja"
           />
         )}
@@ -254,7 +240,7 @@ export default async function DashboardPage() {
         <aside className="lg:col-span-1">
           <AlertsPanel
             lowStock={lowStockMapped}
-            pendingPayments={pendingPaymentsMapped}
+            pendingPayments={null}
             quickActions={quickActions}
           />
         </aside>
