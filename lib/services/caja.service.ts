@@ -20,6 +20,7 @@ interface CajaService {
     search?: string;
     status?: string;
     patientId?: string;
+    hasBalance?: boolean;
     page?: number;
     pageSize?: number;
   }): Promise<CajaPage>;
@@ -30,6 +31,7 @@ interface CajaService {
     organizationId: string,
     data: CreatePaymentInput
   ): Promise<{ record: CajaRecordWithDetails; payment: Payment }>;
+  getTodayIncome(organizationId: string, start: Date, end: Date): Promise<number>;
 }
 
 function calculateStatus(total: Prisma.Decimal, balance: Prisma.Decimal): CajaStatus {
@@ -39,7 +41,7 @@ function calculateStatus(total: Prisma.Decimal, balance: Prisma.Decimal): CajaSt
 }
 
 const service: CajaService = {
-  async list({ organizationId, search, status, patientId, page = 1, pageSize = 20 }) {
+  async list({ organizationId, search, status, patientId, hasBalance, page = 1, pageSize = 20 }) {
     const skip = (page - 1) * pageSize;
     const validStatuses = Object.values(CajaStatus) as string[];
     const cajaStatus =
@@ -49,6 +51,7 @@ const service: CajaService = {
       search,
       status: cajaStatus,
       patientId,
+      hasBalance,
       skip,
       take: pageSize,
     });
@@ -143,6 +146,10 @@ const service: CajaService = {
 
     const updated = (await cajaRepository.findById(cajaRecordId, organizationId))!;
     return { record: updated, payment };
+  },
+
+  getTodayIncome(organizationId, start, end) {
+    return cajaRepository.sumPaymentsInRange(organizationId, start, end);
   },
 };
 

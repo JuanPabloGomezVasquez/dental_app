@@ -28,15 +28,12 @@ interface InventoryRepository {
   }): Promise<InventoryItemWithCategory[]>;
   findById(id: string, organizationId: string): Promise<InventoryItemWithCategory | null>;
   findBySku(sku: string, organizationId: string): Promise<InventoryItem | null>;
-  create(data: CreateInventoryItemInput & { organizationId: string }): Promise<InventoryItemWithCategory>;
+  findCategoryById(id: string, organizationId: string): Promise<InventoryCategory | null>;
+  countAll(organizationId: string): Promise<number>;
+  create(data: CreateInventoryItemInput & { organizationId: string; sku: string }): Promise<InventoryItemWithCategory>;
   update(id: string, organizationId: string, data: UpdateInventoryItemInput): Promise<InventoryItemWithCategory>;
   setActive(id: string, organizationId: string, active: boolean): Promise<InventoryItem>;
-  updateStock(
-    id: string,
-    previousQty: Prisma.Decimal,
-    newQty: number,
-    reason?: string
-  ): Promise<InventoryItem>;
+  updateStock(id: string, previousQty: Prisma.Decimal, newQty: number): Promise<InventoryItem>;
   countLowStock(organizationId: string): Promise<number>;
   getLowStockItems(organizationId: string): Promise<LowStockAlert[]>;
   findAllCategories(organizationId: string): Promise<InventoryCategory[]>;
@@ -74,6 +71,14 @@ const repo: InventoryRepository = {
     return db.inventoryItem.findFirst({ where: { sku, organizationId } });
   },
 
+  findCategoryById(id, organizationId) {
+    return db.inventoryCategory.findFirst({ where: { id, organizationId } });
+  },
+
+  countAll(organizationId) {
+    return db.inventoryItem.count({ where: { organizationId } });
+  },
+
   create(data) {
     return db.inventoryItem.create({
       data,
@@ -93,11 +98,11 @@ const repo: InventoryRepository = {
     return db.inventoryItem.update({ where: { id }, data: { active, organizationId } });
   },
 
-  async updateStock(id, previousQty, newQty, reason) {
+  async updateStock(id, previousQty, newQty) {
     const [updatedItem] = await db.$transaction([
       db.inventoryItem.update({ where: { id }, data: { quantity: newQty } }),
       db.stockLog.create({
-        data: { itemId: id, previousQty, newQty, reason },
+        data: { itemId: id, previousQty, newQty },
       }),
     ]);
     return updatedItem;

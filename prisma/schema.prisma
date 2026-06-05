@@ -92,6 +92,9 @@ model Doctor {
   specialty         String?
   phone             String?
   email             String?
+  idDocument        String?
+  professionalCard  String?
+  rethus            String?
   active            Boolean                  @default(true)
   organizationId    String
   userId            String?                  @unique
@@ -143,20 +146,29 @@ model Patient {
   @@unique([idNumber, organizationId])
 }
 
+enum AppointmentStatus {
+  CONFIRMADA
+  EN_SALA
+  EN_CONSULTA
+  TERMINADA
+  NO_ASISTIO
+}
+
 model Appointment {
-  id             String       @id @default(cuid())
+  id             String            @id @default(cuid())
   patientId      String
   doctorId       String
   procedureId    String
   date           DateTime
+  status         AppointmentStatus @default(CONFIRMADA)
   reminderJobId  String?
   organizationId String
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  patient        Patient      @relation(fields: [patientId], references: [id])
-  doctor         Doctor       @relation(fields: [doctorId], references: [id])
-  procedure      Procedure    @relation(fields: [procedureId], references: [id])
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  patient        Patient           @relation(fields: [patientId], references: [id])
+  doctor         Doctor            @relation(fields: [doctorId], references: [id])
+  procedure      Procedure         @relation(fields: [procedureId], references: [id])
+  organization   Organization      @relation(fields: [organizationId], references: [id])
 }
 
 model ClinicalHistory {

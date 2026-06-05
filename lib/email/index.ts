@@ -8,12 +8,19 @@ function getResend() {
 const FROM = process.env.FROM_EMAIL ?? "DentApp <noreply@dentapp.com>";
 const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
 
+async function sendEmail(payload: Parameters<ReturnType<typeof getResend>["emails"]["send"]>[0]): Promise<void> {
+  const { error } = await getResend().emails.send(payload);
+  if (error) {
+    throw new Error(`Resend error (${error.name}): ${error.message}`);
+  }
+}
+
 export async function sendWelcomeDoctorEmail(
   to: string,
   name: string,
   tempPassword: string
 ): Promise<void> {
-  await getResend().emails.send({
+  await sendEmail({
     from: FROM,
     to,
     subject: "Tu acceso a DentApp",
@@ -38,7 +45,7 @@ export async function sendPasswordResetEmail(
   token: string
 ): Promise<void> {
   const resetUrl = `${APP_URL}/reset-password?token=${token}`;
-  await getResend().emails.send({
+  await sendEmail({
     from: FROM,
     to,
     subject: "Recuperar contraseña — DentApp",

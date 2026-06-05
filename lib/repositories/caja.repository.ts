@@ -42,6 +42,7 @@ interface CajaRepository {
     search?: string;
     status?: CajaStatus;
     patientId?: string;
+    hasBalance?: boolean;
     skip?: number;
     take?: number;
   }): Promise<{ records: CajaRecordWithDetails[]; total: number }>;
@@ -58,14 +59,16 @@ interface CajaRepository {
   updateInvoice(id: string, data: { invoiceId: string; invoiceNumber: string }): Promise<void>;
   addPayment(data: { cajaRecordId: string; amount: number; method: PaymentMethod }): Promise<Payment>;
   getPaymentsByRecord(cajaRecordId: string): Promise<Payment[]>;
+  sumPaymentsInRange(organizationId: string, start: Date, end: Date): Promise<number>;
 }
 
 const repo: CajaRepository = {
-  async findAll({ organizationId, search, status, patientId, skip = 0, take = 20 } = { organizationId: "" }) {
+  async findAll({ organizationId, search, status, patientId, hasBalance, skip = 0, take = 20 } = { organizationId: "" }) {
     const where: Prisma.CajaRecordWhereInput = {
       organizationId,
       ...(status ? { status } : {}),
       ...(patientId ? { patientId } : {}),
+      ...(hasBalance ? { balance: { gt: 0 } } : {}),
       ...(search
         ? {
             patient: {
@@ -122,6 +125,17 @@ const repo: CajaRepository = {
       where: { cajaRecordId },
       orderBy: { createdAt: "asc" },
     });
+  },
+
+  async sumPaymentsInRange(organizationId, start, end) {
+    const result = await db.payment.aggregate({
+      _sum: { amount: true },
+      where: {
+        createdAt: { gte: start, lte: end },
+        cajaRecord: { organizationId },
+      },
+    });
+    return Number(result._sum.amount ?? 0);
   },
 };
 

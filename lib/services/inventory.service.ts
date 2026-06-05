@@ -9,7 +9,7 @@ import type {
   UpdateStockInput,
 } from "@/lib/validations/inventory.schema";
 import type { InventoryCategory } from "@prisma/client";
-import { NotFoundError, ConflictError } from "@/lib/errors";
+import { NotFoundError } from "@/lib/errors";
 
 interface InventoryService {
   list(options: {
@@ -28,6 +28,26 @@ interface InventoryService {
   listCategories(organizationId: string): Promise<Pick<InventoryCategory, "id" | "name">[]>;
 }
 
+async function generateSku(categoryId: string, organizationId: string): Promise<string> {
+  const [category, totalCount] = await Promise.all([
+    inventoryRepository.findCategoryById(categoryId, organizationId),
+    inventoryRepository.countAll(organizationId),
+  ]);
+
+  if (!category) throw new NotFoundError("Categoría no encontrada");
+
+  const prefix = category.name
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^A-Za-z]/g, "")
+    .slice(0, 3)
+    .toUpperCase()
+    .padEnd(3, "X");
+
+  const seq = (totalCount + 1).toString().padStart(3, "0");
+  return `${prefix}${seq}`;
+}
+
 const service: InventoryService = {
   list(options) {
     return inventoryRepository.findAll(options);
@@ -40,18 +60,13 @@ const service: InventoryService = {
   },
 
   async create(data, organizationId) {
-    const existing = await inventoryRepository.findBySku(data.sku, organizationId);
-    if (existing) throw new ConflictError("Ya existe un insumo con ese SKU");
-    return inventoryRepository.create({ ...data, organizationId });
+    const sku = await generateSku(data.categoryId, organizationId);
+    return inventoryRepository.create({ ...data, organizationId, sku });
   },
 
   async update(id, organizationId, data) {
     const existing = await inventoryRepository.findById(id, organizationId);
     if (!existing) throw new NotFoundError("Insumo no encontrado");
-    if (data.sku && data.sku !== existing.sku) {
-      const skuConflict = await inventoryRepository.findBySku(data.sku, organizationId);
-      if (skuConflict) throw new ConflictError("Ya existe un insumo con ese SKU");
-    }
     return inventoryRepository.update(id, organizationId, data);
   },
 
@@ -64,7 +79,7 @@ const service: InventoryService = {
   async updateStock(id, organizationId, data) {
     const existing = await inventoryRepository.findById(id, organizationId);
     if (!existing) throw new NotFoundError("Insumo no encontrado");
-    await inventoryRepository.updateStock(id, existing.quantity, data.newQuantity, data.reason);
+    await inventoryRepository.updateStock(id, existing.quantity, data.newQuantity);
     return (await inventoryRepository.findById(id, organizationId))!;
   },
 

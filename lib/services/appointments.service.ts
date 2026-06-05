@@ -1,4 +1,5 @@
 import type { AppointmentWithRelations, CreateAppointmentInput } from "@/lib/validations/appointment.schema"
+import { AppointmentStatus } from "@prisma/client"
 import { appointmentsRepository } from "@/lib/repositories/appointments.repository"
 import { doctorsRepository } from "@/lib/repositories/doctors.repository"
 import { patientsRepository } from "@/lib/repositories/patients.repository"
@@ -25,6 +26,7 @@ interface AppointmentsService {
   create(data: CreateAppointmentInput, organizationId: string): Promise<AppointmentWithRelations>
   cancel(id: string, organizationId: string): Promise<void>
   getAvailableSlots(doctorId: string, dateStr: string): Promise<string[]>
+  updateStatus(id: string, organizationId: string, status: AppointmentStatus): Promise<AppointmentWithRelations>
 }
 
 const service: AppointmentsService = {
@@ -115,6 +117,12 @@ const service: AppointmentsService = {
         console.error("[appointments.service] Failed to cancel reminder for appointmentId=%s:", id, err)
       }
     }
+  },
+
+  async updateStatus(id, organizationId, status) {
+    const apt = await appointmentsRepository.findById(id, organizationId)
+    if (!apt) throw new NotFoundError("Cita no encontrada")
+    return appointmentsRepository.updateStatus(id, organizationId, status)
   },
 
   async getAvailableSlots(doctorId, dateStr) {

@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { AppointmentStatus } from "@prisma/client"
 
 export const createAppointmentSchema = z.object({
   patientId:   z.string().min(1, "Paciente requerido"),
@@ -7,7 +8,12 @@ export const createAppointmentSchema = z.object({
   date:        z.string().min(1, "Fecha y hora requeridas"),
 })
 
+export const updateAppointmentStatusSchema = z.object({
+  status: z.nativeEnum(AppointmentStatus),
+})
+
 export type CreateAppointmentInput = z.infer<typeof createAppointmentSchema>
+export type UpdateAppointmentStatusInput = z.infer<typeof updateAppointmentStatusSchema>
 
 export type AppointmentWithRelations = {
   id:            string
@@ -15,6 +21,7 @@ export type AppointmentWithRelations = {
   doctorId:      string
   procedureId:   string
   date:          string
+  status:        AppointmentStatus
   reminderJobId: string | null
   createdAt:     string
   updatedAt:     string
@@ -22,3 +29,5 @@ export type AppointmentWithRelations = {
   doctor:        { name: string }
   procedure:     { name: string; cupsCode?: string | null }
 }
+
+export { AppointmentStatus }

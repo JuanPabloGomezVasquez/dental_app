@@ -1,4 +1,5 @@
 import { db } from "@/lib/db"
+import { AppointmentStatus } from "@prisma/client"
 import type { AppointmentWithRelations, CreateAppointmentInput } from "@/lib/validations/appointment.schema"
 
 interface AppointmentsRepository {
@@ -20,6 +21,7 @@ interface AppointmentsRepository {
   }): Promise<AppointmentWithRelations>
   delete(id: string, organizationId: string): Promise<void>
   updateReminderJobId(id: string, reminderJobId: string | null): Promise<void>
+  updateStatus(id: string, organizationId: string, status: AppointmentStatus): Promise<AppointmentWithRelations>
 }
 
 type PrismaAppointmentWithRelations = {
@@ -28,6 +30,7 @@ type PrismaAppointmentWithRelations = {
   doctorId: string
   procedureId: string
   date: Date
+  status: AppointmentStatus
   reminderJobId: string | null
   organizationId: string | null
   createdAt: Date
@@ -102,6 +105,17 @@ const repo: AppointmentsRepository = {
 
   async updateReminderJobId(id, reminderJobId) {
     await db.appointment.update({ where: { id }, data: { reminderJobId } })
+  },
+
+  async updateStatus(id, organizationId, status) {
+    const existing = await db.appointment.findFirst({ where: { id, organizationId } })
+    if (!existing) throw new Error("Not found")
+    const apt = await db.appointment.update({
+      where: { id },
+      data: { status },
+      include: INCLUDE,
+    })
+    return serialize(apt)
   },
 }
 

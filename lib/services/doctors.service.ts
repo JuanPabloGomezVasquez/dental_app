@@ -136,6 +136,12 @@ const service: DoctorsService = {
       });
       await tx.doctor.update({ where: { id: doctorId }, data: { userId: user.id } });
     });
+
+    try {
+      await sendWelcomeDoctorEmail(email, doctor.name, initialPassword);
+    } catch (err) {
+      console.error("[doctors.service] Failed to send welcome email to %s:", email, err);
+    }
   },
 
   async disableLogin(doctorId, organizationId) {
