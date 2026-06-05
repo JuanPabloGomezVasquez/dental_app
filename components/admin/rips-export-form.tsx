@@ -9,10 +9,12 @@ export function RipsExportForm() {
   const [dateFrom, setDateFrom] = useState(firstOfYear);
   const [dateTo, setDateTo] = useState(today);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   async function handleExport() {
     setError(null);
+    setWarning(null);
     if (!dateFrom || !dateTo) {
       setError("Ingrese ambas fechas.");
       return;
@@ -30,7 +32,12 @@ export function RipsExportForm() {
         setError(json.error ?? "Error al generar el archivo RIPS.");
         return;
       }
-      const blob = await res.blob();
+      const json = (await res.json()) as { usuarios?: unknown[] };
+      const usuariosCount = json.usuarios?.length ?? 0;
+      if (usuariosCount === 0) {
+        setWarning("No se encontraron citas en el período seleccionado. El archivo RIPS estará vacío.");
+      }
+      const blob = new Blob([JSON.stringify(json, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -56,7 +63,7 @@ export function RipsExportForm() {
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
           <label htmlFor="rips-date-from" className="block text-sm font-medium text-gray-700">
-            Desde
+            Fecha inicio
           </label>
           <input
             id="rips-date-from"
@@ -70,7 +77,7 @@ export function RipsExportForm() {
 
         <div className="space-y-1">
           <label htmlFor="rips-date-to" className="block text-sm font-medium text-gray-700">
-            Hasta
+            Fecha fin
           </label>
           <input
             id="rips-date-to"
@@ -84,6 +91,7 @@ export function RipsExportForm() {
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
+      {warning && <p className="text-sm text-amber-600">{warning}</p>}
 
       <button
         type="button"

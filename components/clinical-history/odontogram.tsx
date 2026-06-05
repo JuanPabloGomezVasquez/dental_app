@@ -95,13 +95,13 @@ export function Odontogram({ entries, onSurfaceClick, readOnly }: OdontogramProp
         </div>
       </div>
       <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1">
-        {LEGEND.map(([label, color]) => (
-          <div key={label} className="flex items-center gap-1">
+        {LEGEND.map(([status, color]) => (
+          <div key={status} className="flex items-center gap-1">
             <div
               className="h-3 w-3 rounded-sm border border-gray-300"
               style={{ backgroundColor: color }}
             />
-            <span className="text-[10px] text-gray-600">{label}</span>
+            <span className="text-[10px] text-gray-600">{STATUS_LABELS[status]}</span>
           </div>
         ))}
       </div>
@@ -116,6 +116,7 @@ export function Odontogram({ entries, onSurfaceClick, readOnly }: OdontogramProp
                 <th className="border border-gray-200 px-2 py-1 text-left font-medium text-gray-600">Superficie</th>
                 <th className="border border-gray-200 px-2 py-1 text-left font-medium text-gray-600">Estado</th>
                 <th className="border border-gray-200 px-2 py-1 text-left font-medium text-gray-600">Nota</th>
+                {!readOnly && <th className="border border-gray-200 px-2 py-1" />}
               </tr>
             </thead>
             <tbody>
@@ -126,6 +127,17 @@ export function Odontogram({ entries, onSurfaceClick, readOnly }: OdontogramProp
                     <td className="border border-gray-200 px-2 py-1">{SURFACE_LABELS[e.surface]}</td>
                     <td className="border border-gray-200 px-2 py-1">{STATUS_LABELS[e.status]}</td>
                     <td className="border border-gray-200 px-2 py-1 text-gray-500">{e.note ?? "—"}</td>
+                    {!readOnly && (
+                      <td className="border border-gray-200 px-2 py-1 text-center">
+                        <button
+                          type="button"
+                          onClick={() => onSurfaceClick(e.toothNumber, e.surface)}
+                          className="text-[10px] text-blue-600 hover:underline"
+                        >
+                          Editar
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))
               )}

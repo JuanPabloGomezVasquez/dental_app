@@ -10,12 +10,13 @@ import { PatientForm } from "@/components/patients/patient-form";
 interface PatientsPageClientProps {
   data: PatientPage;
   search: string;
+  openNew?: boolean;
 }
 
-export function PatientsPageClient({ data, search }: PatientsPageClientProps) {
+export function PatientsPageClient({ data, search, openNew = false }: PatientsPageClientProps) {
   const router = useRouter();
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
-  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(openNew);
 
   function handleSearch(value: string) {
     const params = new URLSearchParams();
@@ -62,7 +63,7 @@ export function PatientsPageClient({ data, search }: PatientsPageClientProps) {
             onClick={handleNewPatient}
             className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
           >
-            + Nuevo Paciente
+            Nuevo Paciente
           </button>
         </div>
 

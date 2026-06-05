@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
+import { X } from "lucide-react";
 import { InventoryUnit } from "@prisma/client";
 import {
   createInventoryItemSchema,
@@ -21,7 +22,6 @@ interface InventoryFormProps {
 
 const EMPTY: CreateInventoryItemInput = {
   commercialName: "",
-  sku: "",
   categoryId: "",
   quantity: 0,
   unit: InventoryUnit.UNIDAD,
@@ -44,7 +44,6 @@ export function InventoryForm({ open, item, categories, onSuccess, onClose }: In
           ? {
               commercialName: item.commercialName,
               genericName: item.genericName ?? undefined,
-              sku: item.sku,
               categoryId: item.categoryId,
               quantity: Number(item.quantity),
               unit: item.unit,
@@ -84,9 +83,14 @@ export function InventoryForm({ open, item, categories, onSuccess, onClose }: In
     <div className="fixed inset-0 z-50 flex items-center justify-center" role="dialog" aria-modal="true">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} aria-hidden="true" />
       <div className="relative z-10 bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 p-6">
-        <h2 className="text-base font-semibold text-gray-900 mb-4">
-          {item ? "Editar insumo" : "Nuevo insumo"}
-        </h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base font-semibold text-gray-900">
+            {item ? "Editar insumo" : "Nuevo insumo"}
+          </h2>
+          <button type="button" onClick={onClose} aria-label="Cerrar" className="text-gray-400 hover:text-gray-600">
+            <X size={18} />
+          </button>
+        </div>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
           {errors.root && (
             <p role="alert" className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-md">
@@ -104,22 +108,16 @@ export function InventoryForm({ open, item, categories, onSuccess, onClose }: In
               <input {...register("genericName")} className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm" />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-medium text-gray-600">SKU *</label>
-              <input {...register("sku")} className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm" />
-              {errors.sku && <p role="alert" className="text-xs text-red-600 mt-0.5">{errors.sku.message}</p>}
-            </div>
-            <div>
-              <label className="text-xs font-medium text-gray-600">Categoría *</label>
-              <select {...register("categoryId")} className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm">
-                <option value="">Seleccionar...</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-              {errors.categoryId && <p role="alert" className="text-xs text-red-600 mt-0.5">{errors.categoryId.message}</p>}
-            </div>
+          <div>
+            <label className="text-xs font-medium text-gray-600">Categoría *</label>
+            <select {...register("categoryId")} className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm">
+              <option value="">Seleccionar...</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+            {errors.categoryId && <p role="alert" className="text-xs text-red-600 mt-0.5">{errors.categoryId.message}</p>}
+            <p className="mt-0.5 text-[10px] text-gray-400">El SKU se genera automáticamente al guardar.</p>
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div>

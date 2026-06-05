@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Calendar, dateFnsLocalizer, type View } from "react-big-calendar"
 import { format, parse, startOfWeek, getDay } from "date-fns"
 import { es } from "date-fns/locale"
+import { AppointmentStatus } from "@prisma/client"
 import type { AppointmentWithRelations } from "@/lib/validations/appointment.schema"
 
 const localizer = dateFnsLocalizer({
@@ -19,6 +20,8 @@ interface AppointmentCalendarProps {
   onSlotSelect: (date: Date) => void
   onEventSelect: (appointment: AppointmentWithRelations) => void
   onRangeChange: (range: { start: Date; end: Date }) => void
+  currentDate?: Date
+  onNavigate?: (date: Date) => void
 }
 
 type RbcEvent = {
@@ -34,6 +37,8 @@ export function AppointmentCalendar({
   onSlotSelect,
   onEventSelect,
   onRangeChange,
+  currentDate,
+  onNavigate,
 }: AppointmentCalendarProps) {
   const [currentView, setCurrentView] = useState<View>("week")
 
@@ -51,10 +56,24 @@ export function AppointmentCalendar({
     }
   })
 
+  const STATUS_BG: Record<AppointmentStatus, string> = {
+    CONFIRMADA: "#3b82f6",
+    EN_SALA: "#a855f7",
+    EN_CONSULTA: "#f59e0b",
+    TERMINADA: "#22c55e",
+    NO_ASISTIO: "#9ca3af",
+  }
+
   function eventPropGetter(event: RbcEvent) {
-    const isPast = event.end < now
+    const status = event.resource.status
+    const bg = STATUS_BG[status] ?? "#3b82f6"
+    const isDone = status === AppointmentStatus.TERMINADA || status === AppointmentStatus.NO_ASISTIO
     return {
-      style: isPast ? { opacity: 0.45 } : undefined,
+      style: {
+        backgroundColor: bg,
+        borderColor: bg,
+        opacity: isDone ? 0.6 : 1,
+      },
     }
   }
 
@@ -81,6 +100,8 @@ export function AppointmentCalendar({
         defaultView="week"
         view={currentView}
         onView={setCurrentView}
+        date={currentDate}
+        onNavigate={onNavigate}
         selectable
         onSelectSlot={(slot) => onSlotSelect(slot.start)}
         onSelectEvent={(event) => onEventSelect(event.resource)}

@@ -2,7 +2,7 @@
 
 import { PDFDownloadLink, Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import type { PdfExportButtonProps } from "./pdf-export-button";
-import type { ClinicalNote } from "@prisma/client";
+import type { ClinicalNote, OdontogramEntry, Surface, ToothStatus } from "@prisma/client";
 
 const styles = StyleSheet.create({
   page: { padding: 40, fontSize: 11 },
@@ -11,15 +11,76 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 13, marginBottom: 6, marginTop: 14 },
   text: { fontSize: 10, marginBottom: 3, color: "#374151" },
   noteHeader: { fontSize: 10, marginBottom: 2, color: "#1d4ed8" },
+  tableRow: { flexDirection: "row", borderBottomWidth: 0.5, borderBottomColor: "#e5e7eb", paddingVertical: 3 },
+  tableHeader: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: "#d1d5db", paddingVertical: 3, backgroundColor: "#f9fafb" },
+  col1: { width: "15%" },
+  col2: { width: "25%" },
+  col3: { width: "25%" },
+  col4: { width: "35%" },
+  cellText: { fontSize: 9, color: "#374151" },
+  cellHeaderText: { fontSize: 9, color: "#6b7280", fontWeight: "bold" },
 });
+
+const STATUS_LABELS: Record<ToothStatus, string> = {
+  SANO: "Sano",
+  CARIES: "Caries",
+  OBTURACION: "Obturación",
+  CORONA: "Corona",
+  ENDODONCIA: "Endodoncia",
+  IMPLANTE: "Implante",
+  AUSENTE: "Ausente",
+  EXTRAIDO: "Extraído",
+  FRACTURA: "Fractura",
+};
+
+const SURFACE_LABELS: Record<Surface, string> = {
+  OCLUSAL: "Oclusal",
+  MESIAL: "Mesial",
+  DISTAL: "Distal",
+  VESTIBULAR: "Vestibular",
+  LINGUAL: "Lingual",
+};
+
+const NOTE_TYPE_LABELS: Record<string, string> = {
+  INGRESO: "Ingreso",
+  EVOLUCION: "Evolución",
+  PROCEDIMIENTO: "Procedimiento",
+  INTERCONSULTA: "Interconsulta",
+  EGRESO: "Egreso",
+};
 
 function NoteItem({ note }: { note: ClinicalNote }) {
   return (
     <View style={{ marginBottom: 8 }}>
       <Text style={styles.noteHeader}>
-        [{note.type}] {new Date(note.createdAt).toLocaleDateString("es-CO")}
+        [{NOTE_TYPE_LABELS[note.type] ?? note.type}] {new Date(note.createdAt).toLocaleDateString("es-CO")}
       </Text>
       <Text style={styles.text}>{note.content}</Text>
+    </View>
+  );
+}
+
+function OdontogramSection({ entries }: { entries: OdontogramEntry[] }) {
+  const findings = entries.filter((e) => e.status !== "SANO");
+  if (findings.length === 0) return null;
+
+  return (
+    <View>
+      <Text style={styles.sectionTitle}>Odontograma — Hallazgos</Text>
+      <View style={styles.tableHeader}>
+        <View style={styles.col1}><Text style={styles.cellHeaderText}>Diente</Text></View>
+        <View style={styles.col2}><Text style={styles.cellHeaderText}>Superficie</Text></View>
+        <View style={styles.col3}><Text style={styles.cellHeaderText}>Estado</Text></View>
+        <View style={styles.col4}><Text style={styles.cellHeaderText}>Nota</Text></View>
+      </View>
+      {findings.map((e) => (
+        <View key={e.id} style={styles.tableRow}>
+          <View style={styles.col1}><Text style={styles.cellText}>{e.toothNumber}</Text></View>
+          <View style={styles.col2}><Text style={styles.cellText}>{SURFACE_LABELS[e.surface]}</Text></View>
+          <View style={styles.col3}><Text style={styles.cellText}>{STATUS_LABELS[e.status]}</Text></View>
+          <View style={styles.col4}><Text style={styles.cellText}>{e.note ?? "—"}</Text></View>
+        </View>
+      ))}
     </View>
   );
 }
@@ -37,6 +98,9 @@ function HistoryDocument({ patient, history }: PdfExportButtonProps) {
             <Text style={styles.sectionTitle}>Antecedentes</Text>
             <Text style={styles.text}>{history.background}</Text>
           </View>
+        ) : null}
+        {history.odontogram.length > 0 ? (
+          <OdontogramSection entries={history.odontogram} />
         ) : null}
         {history.notes.length > 0 ? (
           <View>

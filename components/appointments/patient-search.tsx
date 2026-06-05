@@ -136,7 +136,7 @@ export function PatientSearch({
             onClick={onNewPatient}
             className="w-full text-left px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 border-t border-gray-100"
           >
-            + Nuevo Paciente
+            Nuevo Paciente
           </button>
         </div>
       )}

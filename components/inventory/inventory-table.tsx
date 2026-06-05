@@ -111,11 +111,11 @@ export function InventoryTable({
                     <td className="px-4 py-3 text-right">
                       <span className="inline-flex items-center gap-1 justify-end">
                         {isLow && <AlertTriangle size={14} className="text-orange-500" />}
-                        {Number(item.quantity).toFixed(3)} {item.unit}
+                        {Number(item.quantity).toLocaleString("es-CO", { maximumFractionDigits: 3 })} {item.unit.toLowerCase()}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right text-gray-600">
-                      {Number(item.minStock).toFixed(3)}
+                      {Number(item.minStock).toLocaleString("es-CO", { maximumFractionDigits: 3 })}
                     </td>
                     <td className="px-4 py-3"><StatusBadge active={item.active} /></td>
                     <td className="px-4 py-3 text-right">

@@ -74,7 +74,12 @@ export function PatientTable({
                   <tr key={patient.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium text-gray-900">
                       <div className="flex items-center gap-2">
-                        {`${patient.lastName}, ${patient.firstName}`}
+                        <Link
+                          href={`/patients/${patient.id}`}
+                          className="hover:text-blue-600 hover:underline"
+                        >
+                          {`${patient.lastName}, ${patient.firstName}`}
+                        </Link>
                         {!patient.habeaDataConsent && (
                           <span
                             role="img"

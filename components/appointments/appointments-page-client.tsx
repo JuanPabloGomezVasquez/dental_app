@@ -10,11 +10,13 @@ import { DoctorFilter } from "@/components/appointments/doctor-filter"
 interface AppointmentsPageClientProps {
   initialAppointments: AppointmentWithRelations[]
   initialRange: { start: string; end: string }
+  openNew?: boolean
 }
 
 export function AppointmentsPageClient({
   initialAppointments,
   initialRange,
+  openNew = false,
 }: AppointmentsPageClientProps) {
   const [appointments, setAppointments] = useState<AppointmentWithRelations[]>(initialAppointments)
   const [currentRange, setCurrentRange] = useState({
@@ -22,7 +24,8 @@ export function AppointmentsPageClient({
     end: new Date(initialRange.end),
   })
   const [selectedDoctorId, setSelectedDoctorId] = useState<string | null>(null)
-  const [isFormOpen, setIsFormOpen] = useState(false)
+  const [calendarDate, setCalendarDate] = useState<Date>(new Date())
+  const [isFormOpen, setIsFormOpen] = useState(openNew)
   const [selectedSlot, setSelectedSlot] = useState<Date | null>(null)
   const [selectedAppointment, setSelectedAppointment] = useState<AppointmentWithRelations | null>(null)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
@@ -84,13 +87,25 @@ export function AppointmentsPageClient({
           <p className="text-sm text-gray-500 mt-0.5">Gestiona las citas del consultorio</p>
         </div>
         <div className="flex items-center gap-3">
+          <input
+            type="date"
+            value={calendarDate.toISOString().split("T")[0]}
+            onChange={(e) => {
+              if (e.target.value) {
+                const picked = new Date(e.target.value + "T12:00:00")
+                setCalendarDate(picked)
+              }
+            }}
+            className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            aria-label="Ir a fecha"
+          />
           <DoctorFilter selectedDoctorId={selectedDoctorId} onChange={handleDoctorChange} />
           <button
             type="button"
             onClick={() => { setSelectedSlot(null); setIsFormOpen(true) }}
             className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
           >
-            + Nueva Cita
+            Nueva Cita
           </button>
         </div>
       </div>
@@ -106,6 +121,8 @@ export function AppointmentsPageClient({
           onSlotSelect={handleSlotSelect}
           onEventSelect={handleEventSelect}
           onRangeChange={handleRangeChange}
+          currentDate={calendarDate}
+          onNavigate={setCalendarDate}
         />
       </div>
 

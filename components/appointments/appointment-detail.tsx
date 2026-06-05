@@ -1,8 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useTransition } from "react"
 import { toast } from "sonner"
 import { X } from "lucide-react"
+import { AppointmentStatus } from "@prisma/client"
 import type { AppointmentWithRelations } from "@/lib/validations/appointment.schema"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 
@@ -11,24 +12,56 @@ interface AppointmentDetailProps {
   appointment: AppointmentWithRelations | null
   onCancel: (id: string) => Promise<void>
   onClose: () => void
+  onStatusChange?: (id: string, status: AppointmentStatus) => void
 }
+
+const STATUS_LABELS: Record<AppointmentStatus, string> = {
+  CONFIRMADA: "Confirmada",
+  EN_SALA: "En sala",
+  EN_CONSULTA: "En consulta",
+  TERMINADA: "Terminada",
+  NO_ASISTIO: "No asistió",
+}
+
+const STATUS_COLORS: Record<AppointmentStatus, string> = {
+  CONFIRMADA: "bg-blue-100 text-blue-700",
+  EN_SALA: "bg-purple-100 text-purple-700",
+  EN_CONSULTA: "bg-amber-100 text-amber-700",
+  TERMINADA: "bg-green-100 text-green-700",
+  NO_ASISTIO: "bg-gray-100 text-gray-500",
+}
+
+const STATUS_ORDER: AppointmentStatus[] = [
+  AppointmentStatus.CONFIRMADA,
+  AppointmentStatus.EN_SALA,
+  AppointmentStatus.EN_CONSULTA,
+  AppointmentStatus.TERMINADA,
+  AppointmentStatus.NO_ASISTIO,
+]
 
 export function AppointmentDetail({
   open,
   appointment,
   onCancel,
   onClose,
+  onStatusChange,
 }: AppointmentDetailProps) {
   const [isConfirmOpen, setIsConfirmOpen] = useState(false)
   const [isCanceling, setIsCanceling] = useState(false)
+  const [currentStatus, setCurrentStatus] = useState<AppointmentStatus>(
+    appointment?.status ?? AppointmentStatus.CONFIRMADA
+  )
+  const [isPending, startTransition] = useTransition()
 
-  // Reset internal state when modal closes
   useEffect(() => {
     if (!open) {
       setIsConfirmOpen(false)
       setIsCanceling(false)
     }
-  }, [open])
+    if (appointment) {
+      setCurrentStatus(appointment.status)
+    }
+  }, [open, appointment])
 
   if (!open || !appointment) return <></>
 
@@ -55,6 +88,24 @@ export function AppointmentDetail({
     } finally {
       setIsCanceling(false)
     }
+  }
+
+  function handleStatusChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const next = e.target.value as AppointmentStatus
+    startTransition(async () => {
+      const res = await fetch(`/api/appointments/${appointment!.id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: next }),
+      })
+      if (res.ok) {
+        setCurrentStatus(next)
+        onStatusChange?.(appointment!.id, next)
+        toast.success("Estado actualizado")
+      } else {
+        toast.error("No se pudo actualizar el estado")
+      }
+    })
   }
 
   return (
@@ -99,6 +150,21 @@ export function AppointmentDetail({
             <div>
               <p className="text-xs text-gray-500 uppercase tracking-wide">Fecha y hora</p>
               <p className="text-sm font-medium text-gray-900 mt-0.5 capitalize">{formattedDate}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 uppercase tracking-wide mb-1.5">Estado</p>
+              <select
+                value={currentStatus}
+                onChange={handleStatusChange}
+                disabled={isPending}
+                className={`text-sm font-medium px-3 py-1.5 rounded-lg border border-gray-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 ${STATUS_COLORS[currentStatus]}`}
+              >
+                {STATUS_ORDER.map((s) => (
+                  <option key={s} value={s} className="text-gray-900 bg-white">
+                    {STATUS_LABELS[s]}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 

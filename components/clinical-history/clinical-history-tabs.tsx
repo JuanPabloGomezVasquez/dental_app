@@ -26,6 +26,7 @@ type SelectedSurface = { toothNumber: number; surface: Surface } | null;
 export function ClinicalHistoryTabs({ history, patientId, currentDoctorId, currentRole, onUpdate }: ClinicalHistoryTabsProps) {
   const [activeTab, setActiveTab] = useState<Tab>("Antecedentes");
   const [background, setBackground] = useState(history.background ?? "");
+  const [isEditingBg, setIsEditingBg] = useState(false);
   const [isSavingBg, setIsSavingBg] = useState(false);
   const [selectedSurface, setSelectedSurface] = useState<SelectedSurface>(null);
 
@@ -42,6 +43,7 @@ export function ClinicalHistoryTabs({ history, patientId, currentDoctorId, curre
       return;
     }
     toast.success("Antecedentes guardados");
+    setIsEditingBg(false);
     onUpdate();
   }
 
@@ -73,19 +75,47 @@ export function ClinicalHistoryTabs({ history, patientId, currentDoctorId, curre
 
       {activeTab === "Antecedentes" && (
         <div className="space-y-3">
-          <textarea
-            value={background}
-            onChange={(e) => setBackground(e.target.value)}
-            placeholder="Antecedentes médicos y odontológicos relevantes..."
-            className="w-full rounded-md border border-gray-300 p-3 text-sm min-h-[160px] focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <button
-            onClick={handleSaveBackground}
-            disabled={isSavingBg}
-            className="px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 disabled:opacity-50"
-          >
-            {isSavingBg ? "Guardando..." : "Guardar"}
-          </button>
+          {isEditingBg ? (
+            <>
+              <textarea
+                value={background}
+                onChange={(e) => setBackground(e.target.value)}
+                placeholder="Antecedentes médicos y odontológicos relevantes..."
+                className="w-full rounded-md border border-gray-300 p-3 text-sm min-h-[160px] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                autoFocus
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={handleSaveBackground}
+                  disabled={isSavingBg}
+                  className="px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {isSavingBg ? "Guardando..." : "Guardar"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setBackground(history.background ?? ""); setIsEditingBg(false); }}
+                  disabled={isSavingBg}
+                  className="px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="group relative">
+              <div className="w-full rounded-md border border-gray-200 bg-gray-50 p-3 text-sm min-h-[160px] text-gray-800 whitespace-pre-wrap">
+                {background || <span className="text-gray-400">Sin antecedentes registrados</span>}
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEditingBg(true)}
+                className="mt-2 text-xs text-blue-600 hover:underline font-medium"
+              >
+                Editar antecedentes
+              </button>
+            </div>
+          )}
         </div>
       )}
 
