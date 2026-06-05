@@ -36,8 +36,6 @@ export function makeReadTools(ctx: AgentContext): ToolDefinition[] {
           const page = typeof input["page"] === "number" ? input["page"] : 1;
           const result = await patientsService.list({
             organizationId: ctx.organizationId,
-            callerRole: ctx.callerRole,
-            callerDoctorId: ctx.callerDoctorId,
             search,
             page,
             pageSize: 10,

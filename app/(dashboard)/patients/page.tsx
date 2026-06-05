@@ -17,8 +17,6 @@ export default async function PatientsPage({ searchParams }: PatientsPageProps) 
   const page = Math.max(1, parseInt(params.page ?? "1") || 1);
   const data = await patientsService.list({
     organizationId: session.organizationId,
-    callerRole: session.role,
-    callerDoctorId: session.doctorId,
     search,
     page,
   });
