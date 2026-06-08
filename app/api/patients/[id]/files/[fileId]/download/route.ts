@@ -1,5 +1,4 @@
 import type { NextRequest } from "next/server";
-import { head } from "@vercel/blob";
 import { verifySession } from "@/lib/dal";
 import { getAccessibleModules, assertModuleAccess, AppModule } from "@/lib/modules";
 import { clinicalHistoryService } from "@/lib/services/clinical-history.service";
@@ -18,11 +17,24 @@ export async function GET(
 
   try {
     const file = await clinicalHistoryService.getFile(id, fileId);
-    const meta = await head(file.url);
-    if (!meta) {
-      return Response.json({ error: "Archivo no encontrado en almacenamiento" }, { status: 404 });
+
+    const blobResponse = await fetch(file.url, {
+      headers: {
+        Authorization: `Bearer ${process.env.BLOB_READ_WRITE_TOKEN ?? ""}`,
+      },
+    });
+
+    if (!blobResponse.ok) {
+      return Response.json({ error: "Archivo no disponible en almacenamiento" }, { status: 404 });
     }
-    return Response.redirect(meta.downloadUrl, 302);
+
+    return new Response(blobResponse.body, {
+      headers: {
+        "Content-Type": file.mimeType,
+        "Content-Disposition": `inline; filename="${encodeURIComponent(file.name)}"`,
+        "Cache-Control": "private, no-store",
+      },
+    });
   } catch (error) {
     return handleApiError(error);
   }
