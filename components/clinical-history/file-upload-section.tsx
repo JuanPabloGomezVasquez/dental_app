@@ -110,7 +110,7 @@ export function FileUploadSection({ files, patientId, onUpdate }: FileUploadSect
               </div>
               <div className="flex items-center gap-2 ml-2 shrink-0">
                 <a
-                  href={f.url}
+                  href={`/api/patients/${patientId}/files/${f.id}/download`}
                   target="_blank"
                   rel="noreferrer"
                   className="text-xs text-blue-600 hover:underline"

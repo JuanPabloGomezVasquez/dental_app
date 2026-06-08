@@ -31,6 +31,7 @@ interface ClinicalHistoryService {
     fileData: { name: string; label?: string; url: string; mimeType: string }
   ): Promise<PatientFile>;
   deleteFile(patientId: string, fileId: string): Promise<void>;
+  getFile(patientId: string, fileId: string): Promise<PatientFile>;
 }
 
 async function getHistory(patientId: string): Promise<ClinicalHistoryFull> {
@@ -100,6 +101,15 @@ const service: ClinicalHistoryService = {
   async deleteFile(patientId, fileId) {
     await getHistory(patientId);
     await clinicalHistoryRepository.deleteFile(fileId);
+  },
+
+  async getFile(patientId, fileId) {
+    const history = await getHistory(patientId);
+    const file = await clinicalHistoryRepository.findFileById(fileId);
+    if (!file || file.clinicalHistoryId !== history.id) {
+      throw new NotFoundError("Archivo no encontrado");
+    }
+    return file;
   },
 };
 

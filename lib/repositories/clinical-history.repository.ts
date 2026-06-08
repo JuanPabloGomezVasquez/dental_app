@@ -17,6 +17,7 @@ export type ClinicalHistoryFull = ClinicalHistory & {
 interface ClinicalHistoryRepository {
   findByPatientId(patientId: string): Promise<ClinicalHistoryFull | null>;
   findNoteById(noteId: string): Promise<ClinicalNote | null>;
+  findFileById(fileId: string): Promise<PatientFile | null>;
   updateBackground(id: string, data: UpdateBackgroundInput): Promise<ClinicalHistory>;
   addNote(clinicalHistoryId: string, data: CreateNoteInput & { doctorId: string }): Promise<NoteWithDoctor>;
   updateNote(noteId: string, content: string): Promise<NoteWithDoctor>;
@@ -50,6 +51,10 @@ const repo: ClinicalHistoryRepository = {
 
   findNoteById(noteId) {
     return db.clinicalNote.findUnique({ where: { id: noteId } });
+  },
+
+  findFileById(fileId) {
+    return db.patientFile.findUnique({ where: { id: fileId } });
   },
 
   updateBackground(id, data) {

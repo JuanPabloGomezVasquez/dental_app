@@ -41,7 +41,7 @@ export async function POST(
 
   let blob: Awaited<ReturnType<typeof put>>;
   try {
-    blob = await put(file.name, file, { access: "public" });
+    blob = await put(file.name, file, { access: "private" });
   } catch (blobError) {
     const msg = blobError instanceof Error ? blobError.message : String(blobError);
     console.error("[files/route] Vercel Blob put() error:", msg);
