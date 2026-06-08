@@ -20,8 +20,11 @@ export const sendWhatsappReminderFn = inngest.createFunction(
       appointmentDate: string;
     };
 
-    const reminderTime = new Date(appointmentDate);
-    reminderTime.setHours(reminderTime.getHours() - 24);
+    const appointmentMs = new Date(appointmentDate).getTime();
+    if (isNaN(appointmentMs)) {
+      return { skipped: true, reason: "invalid_appointment_date" };
+    }
+    const reminderTime = new Date(appointmentMs - 24 * 60 * 60 * 1000);
     await step.sleepUntil("wait-until-reminder-time", reminderTime);
 
     const appointment = await step.run("fetch-appointment", async () => {
